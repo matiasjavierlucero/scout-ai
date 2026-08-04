@@ -1,0 +1,14 @@
+[project]
+name = "scout-ai"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain-core>=1.5.3",
+    "langchain-ollama>=1.1.0",
+    "langgraph>=1.2.10",
+    "numpy>=2.5.1",
+    "pandas>=3.0.5",
+    "sentence-transformers>=5.6.1",
+    "statsbombpy>=1.22.0",
+]
