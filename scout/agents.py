@@ -18,7 +18,6 @@ from langchain_ollama import ChatOllama
 
 from scout.tools import (
     buscar_jugadores,
-    buscar_por_nombre,
     comparar_jugadores,
     stats_jugador,
 )
@@ -44,25 +43,23 @@ rag_agent = create_agent(
 
 stats_agent = create_agent(
     model=_llm,
-    tools=[buscar_por_nombre, stats_jugador],
+    tools=[stats_jugador],
     system_prompt=(
         "Sos un agente de scouting especializado en estadísticas de jugadores. "
-        "Cuando recibís un nombre, primero usá buscar_por_nombre para encontrar el nombre "
-        "exacto en el dataset, luego usá stats_jugador para obtener sus estadísticas. "
-        "Si hay múltiples candidatos, elegí el más relevante según contexto. "
-        "Siempre mencioná la advertencia de muestra pequeña si el jugador tiene menos de 450 minutos."
+        "Dado un nombre, usá directamente stats_jugador — la tool hace fuzzy matching "
+        "internamente si el nombre no es exacto. "
+        "Mencioná la advertencia de muestra pequeña si el jugador tiene menos de 450 minutos."
     ),
 )
 
 comp_agent = create_agent(
     model=_llm,
-    tools=[buscar_por_nombre, comparar_jugadores],
+    tools=[comparar_jugadores],
     system_prompt=(
         "Sos un agente de scouting especializado en comparación de jugadores. "
-        "Cuando recibís dos nombres, primero resolvé cada nombre con buscar_por_nombre, "
-        "luego usá comparar_jugadores con los nombres exactos del dataset. "
-        "Presentá la tabla comparativa tal como viene de la tool y agregá una conclusión "
-        "breve sobre cuál jugador destaca en cada aspecto. "
+        "Dados dos nombres, usá comparar_jugadores directamente — la tool hace fuzzy matching "
+        "internamente para cada jugador. "
+        "Presentá la tabla comparativa tal como viene de la tool. "
         "Mencioná advertencias de muestra pequeña si aplica."
     ),
 )

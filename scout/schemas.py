@@ -16,6 +16,7 @@ class InformeScouting(BaseModel):
     estadisticas: str = Field(default="", description="Resultado del agente Stats")
     comparativa: str = Field(default="", description="Resultado del agente Comp")
     conclusion: str = Field(default="", description="Conclusión generada por el LLM")
+    jugadores_detectados: list[str] = Field(default_factory=list, description="Jugadores resueltos en esta query")
 
     def display(self) -> str:
         """Formatea el informe completo para mostrar en terminal."""

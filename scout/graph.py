@@ -43,10 +43,12 @@ class ScoutState(TypedDict):
     routing: dict  # {"needs_rag": bool, "needs_stats": bool, "needs_comp": bool}
     # Annotated con operator.add permite que nodos paralelos hagan append
     # sin pisarse — cada nodo agrega su resultado a la lista
-    rag_results:   Annotated[list[str], operator.add]
-    stats_results: Annotated[list[str], operator.add]
-    comp_results:  Annotated[list[str], operator.add]
-    final_report:  str
+    rag_results:        Annotated[list[str], operator.add]
+    stats_results:      Annotated[list[str], operator.add]
+    comp_results:       Annotated[list[str], operator.add]
+    final_report:       str
+    jugadores_detectados: list[str]  # jugadores resueltos en el orchestrator
+    context_players:    list[str]    # jugadores del turno anterior (inyectado desde app)
 
 
 # ── Heurísticas de routing ───────────────────────────────────────────────────
@@ -69,65 +71,93 @@ _INDEX_NAMES = _load_index_names()
 print(f"[graph] Índice de nombres cargado — {len(_INDEX_NAMES)} jugadores")
 
 
-def _detect_routing(query: str) -> dict[str, bool]:
+def _detect_routing(query: str) -> tuple[dict[str, bool], list[str]]:
     """
     Analiza la query con heurísticas para decidir qué agentes invocar.
 
-    Orden de precedencia:
-    1. Palabras clave de comparación → needs_comp + needs_stats
-    2. Token de nombre de jugador detectado → needs_stats
-    3. Sin coincidencias → needs_rag (query descriptiva de perfil)
-
     Returns:
-        dict con needs_rag, needs_stats, needs_comp como booleans.
+        (routing_dict, distinct_players) — jugadores verdaderamente distintos detectados.
+
+    Un jugador es "distinto" si aporta tokens únicos que ningún match anterior cubre.
+    Esto evita que "Lionel Messi" detecte a Siviero (solo comparte "lionel") como
+    segundo jugador y dispare una comparación falsa.
     """
     query_lower = query.lower()
-    query_tokens = {
-        t for t in query_lower.split()
-        if len(t) > 3 and t not in _STOPWORDS
-    }
+
+    # Limpiar puntuación de cada token antes de filtrar (evita "ronaldo?" ≠ "ronaldo")
+    query_tokens = set()
+    for t in query_lower.split():
+        clean = t.strip("?!.,;:'\"")
+        if len(clean) > 3 and clean not in _STOPWORDS:
+            query_tokens.add(clean)
 
     print(f"[routing] Tokens significativos: {query_tokens}")
 
-    # 1. Detectar intención de comparación
+    # 1. Detectar intención de comparación por palabras clave
     needs_comp = any(kw in query_lower for kw in _COMP_KEYWORDS)
     if needs_comp:
         print("[routing] → needs_comp (keyword de comparación detectada)")
 
-    # 2. Detectar nombres de jugadores en la query
-    matched_names = []
+    # 2. Recolectar matches con cuántos tokens coinciden
+    scored_matches = []
     for name in _INDEX_NAMES:
         name_tokens = set(name.lower().split())
-        if query_tokens & name_tokens:
-            matched_names.append(name)
-        if len(matched_names) >= 2:
+        overlapping = query_tokens & name_tokens
+        if overlapping:
+            scored_matches.append((name, overlapping))
+
+    # Ordenar por tokens en común — más tokens = match más específico
+    scored_matches.sort(key=lambda x: len(x[1]), reverse=True)
+
+    print(f"[routing] Top matches: {[(n, t) for n, t in scored_matches[:3]]}")
+
+    # 3. Extraer jugadores verdaderamente distintos (cada uno aporta tokens nuevos)
+    distinct_players: list[str] = []
+    covered_tokens: set[str] = set()
+    for name, tokens in scored_matches:
+        unique = tokens - covered_tokens
+        if unique:  # solo agrega si tiene tokens que ningún match anterior cubre
+            distinct_players.append(name)
+            covered_tokens |= tokens
+        if len(distinct_players) >= 2:
             break
 
-    print(f"[routing] Nombres detectados: {matched_names}")
+    print(f"[routing] Jugadores distintos: {distinct_players}")
 
-    needs_stats = len(matched_names) >= 1
-    if len(matched_names) >= 2:
+    needs_stats = len(distinct_players) >= 1
+    if not needs_comp and len(distinct_players) >= 2:
         needs_comp = True
+        print(f"[routing] → needs_comp (dos jugadores con tokens distintos)")
 
-    # 3. Si no hay nada concreto → búsqueda semántica
+    # 4. Sin jugadores → búsqueda semántica
     needs_rag = not needs_stats and not needs_comp
 
     routing = {"needs_rag": needs_rag, "needs_stats": needs_stats, "needs_comp": needs_comp}
     print(f"[routing] Decisión final: {routing}")
-    return routing
+    return routing, distinct_players
 
 
 # ── Nodos del graph ──────────────────────────────────────────────────────────
 
 def orchestrator_node(state: ScoutState) -> dict:
     """
-    Nodo inicial. Analiza la query con heurísticas y guarda la decisión en el estado.
-    La función de edge `route_to_agents` lee esa decisión y despacha los Send.
-    En LangGraph 1.x los nodos siempre devuelven dict — los Send van en el edge.
+    Nodo inicial. Analiza la query, resuelve jugadores y guarda la decisión en el estado.
+
+    Si needs_comp=True pero solo se detectó 1 jugador (o ninguno), inyecta el jugador
+    del turno anterior (context_players) como primer elemento. Esto permite queries
+    como "comparalo con Ronaldo" después de haber preguntado por Messi.
     """
     print(f"\n[orchestrator] Query recibida: '{state['query']}'")
-    routing = _detect_routing(state["query"])
-    return {"routing": routing}
+    routing, players = _detect_routing(state["query"])
+
+    context = state.get("context_players", [])
+    if routing["needs_comp"] and len(players) <= 1 and context:
+        # Falta un jugador para comparar — tomamos el del turno anterior
+        injected = context[0]
+        players = [injected] + players
+        print(f"[orchestrator] Contexto inyectado: '{injected}'")
+
+    return {"routing": routing, "jugadores_detectados": players}
 
 
 def route_to_agents(state: ScoutState) -> list[Send]:
@@ -140,7 +170,8 @@ def route_to_agents(state: ScoutState) -> list[Send]:
     if routing["needs_rag"]:
         print("[orchestrator] → despachando rag_node")
         sends.append(Send("rag_node", state))
-    if routing["needs_stats"]:
+    if routing["needs_stats"] and not routing["needs_comp"]:
+        # Cuando hay comparación, la tabla ya incluye las stats de ambos jugadores
         print("[orchestrator] → despachando stats_node")
         sends.append(Send("stats_node", state))
     if routing["needs_comp"]:
@@ -157,16 +188,25 @@ def rag_node(state: ScoutState) -> dict:
 
 
 def stats_node(state: ScoutState) -> dict:
-    """Nodo del agente Stats. Busca y devuelve stats del jugador mencionado."""
+    """Nodo del agente Stats. Usa el jugador ya resuelto por el orchestrator."""
     print(f"\n[stats_node] Ejecutando...")
-    result = run_stats_agent(state["query"])
+    players = state.get("jugadores_detectados", [])
+    query = f"Dame las stats de {players[0]}" if players else state["query"]
+    print(f"[stats_node] Query: '{query}'")
+    result = run_stats_agent(query)
     return {"stats_results": [result]}
 
 
 def comp_node(state: ScoutState) -> dict:
-    """Nodo del agente Comp. Compara dos jugadores mencionados en la query."""
+    """Nodo del agente Comp. Usa los dos jugadores ya resueltos por el orchestrator."""
     print(f"\n[comp_node] Ejecutando...")
-    result = run_comp_agent(state["query"])
+    players = state.get("jugadores_detectados", [])
+    if len(players) >= 2:
+        query = f"Compará a {players[0]} con {players[1]}"
+    else:
+        query = state["query"]
+    print(f"[comp_node] Query: '{query}'")
+    result = run_comp_agent(query)
     return {"comp_results": [result]}
 
 
@@ -242,6 +282,7 @@ def synthesis_node(state: ScoutState) -> dict:
         estadisticas=sections.get("stats", ""),
         comparativa=sections.get("comp", ""),
         conclusion=conclusion,
+        jugadores_detectados=state.get("jugadores_detectados", []),
     )
 
     print(f"[synthesis] InformeScouting construido")
@@ -285,13 +326,18 @@ print("[graph] Graph compilado y listo.\n")
 
 # ── API pública ──────────────────────────────────────────────────────────────
 
-def run(query: str, thread_id: str = "default") -> InformeScouting:
+def run(
+    query: str,
+    thread_id: str = "default",
+    context_players: list[str] | None = None,
+) -> InformeScouting:
     """
     Punto de entrada principal. Ejecuta el graph completo para una query.
 
     Args:
         query: Pregunta o descripción del usuario en lenguaje natural.
         thread_id: ID de conversación para MemorySaver (memoria entre queries).
+        context_players: Jugadores del turno anterior para resolver follow-ups.
 
     Returns:
         InformeScouting con todos los campos estructurados.
@@ -304,6 +350,8 @@ def run(query: str, thread_id: str = "default") -> InformeScouting:
         "stats_results": [],
         "comp_results": [],
         "final_report": "",
+        "jugadores_detectados": [],
+        "context_players": context_players or [],
     }
 
     print(f"\n{'='*60}")
