@@ -13,6 +13,7 @@ Cada agente es un graph compilado que maneja el loop ReAct internamente:
 """
 
 from langchain.agents import create_agent
+from langchain_core.messages import ToolMessage
 from langchain_ollama import ChatOllama
 
 from scout.tools import (
@@ -67,11 +68,28 @@ comp_agent = create_agent(
 )
 
 
+def _extract_tool_output(messages: list) -> str:
+    """
+    Extrae el contenido del último ToolMessage de la conversación del agente.
+
+    llama3.2:3b tiende a parafrasear el output de las tools en vez de copiarlo.
+    Tomamos el ToolMessage directamente para garantizar que el dato real llegue
+    al informe final, sin pasar por el LLM.
+
+    Si no hay ToolMessage (el agente respondió sin llamar tools), devuelve
+    el último mensaje del LLM como fallback.
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage):
+            return msg.content
+    return messages[-1].content
+
+
 def run_rag_agent(query: str) -> str:
     """Ejecuta el agente RAG con una query de perfil de juego."""
     print(f"\n[rag_agent] Ejecutando con query: '{query}'")
     result = rag_agent.invoke({"messages": [("user", query)]})
-    response = result["messages"][-1].content
+    response = _extract_tool_output(result["messages"])
     print(f"[rag_agent] Respuesta generada ({len(response)} chars)")
     return response
 
@@ -80,7 +98,7 @@ def run_stats_agent(query: str) -> str:
     """Ejecuta el agente Stats con una query sobre un jugador."""
     print(f"\n[stats_agent] Ejecutando con query: '{query}'")
     result = stats_agent.invoke({"messages": [("user", query)]})
-    response = result["messages"][-1].content
+    response = _extract_tool_output(result["messages"])
     print(f"[stats_agent] Respuesta generada ({len(response)} chars)")
     return response
 
@@ -89,6 +107,6 @@ def run_comp_agent(query: str) -> str:
     """Ejecuta el agente Comp con una query de comparación entre dos jugadores."""
     print(f"\n[comp_agent] Ejecutando con query: '{query}'")
     result = comp_agent.invoke({"messages": [("user", query)]})
-    response = result["messages"][-1].content
+    response = _extract_tool_output(result["messages"])
     print(f"[comp_agent] Respuesta generada ({len(response)} chars)")
     return response
