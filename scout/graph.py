@@ -16,11 +16,16 @@ Heurísticas de routing:
 import operator
 from typing import Annotated, TypedDict
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import Send
 from langgraph.graph import END, START, StateGraph
 
 from scout.agents import run_comp_agent, run_rag_agent, run_stats_agent
+from scout.schemas import InformeScouting
+
+_conclusion_llm = ChatOllama(model="llama3.2:3b", temperature=0.3)
 
 # ── Stopwords que ignoramos al detectar nombres de jugadores ─────────────────
 
@@ -165,31 +170,82 @@ def comp_node(state: ScoutState) -> dict:
     return {"comp_results": [result]}
 
 
+def _generate_conclusion(query: str, sections: dict) -> str:
+    """
+    Usa el LLM para generar una conclusión breve (2-3 oraciones) basada
+    en los resultados de los agentes. Temperature 0.3 para algo de variedad
+    sin perder coherencia. El prompt es intencionalmente corto y directo
+    para que llama3.2:3b lo siga sin inventar datos.
+    """
+    context_parts = []
+    if sections.get("rag"):
+        context_parts.append(f"Jugadores sugeridos:\n{sections['rag']}")
+    if sections.get("stats"):
+        context_parts.append(f"Estadísticas:\n{sections['stats']}")
+    if sections.get("comp"):
+        context_parts.append(f"Comparativa:\n{sections['comp']}")
+
+    context = "\n\n".join(context_parts)
+
+    messages = [
+        SystemMessage(
+            "Sos un analista de scouting. Escribí una conclusión de 2 a 3 oraciones "
+            "basada SOLO en los datos que se te dan. No inventes estadísticas. "
+            "Sé directo y concreto."
+        ),
+        HumanMessage(
+            f"Query del usuario: {query}\n\n"
+            f"Datos disponibles:\n{context}\n\n"
+            "Conclusión:"
+        ),
+    ]
+
+    print("[synthesis] Generando conclusión con LLM...")
+    response = _conclusion_llm.invoke(messages)
+    conclusion = response.content.strip()
+    print(f"[synthesis] Conclusión generada ({len(conclusion)} chars)")
+    return conclusion
+
+
 def synthesis_node(state: ScoutState) -> dict:
     """
-    Nodo final. Combina los resultados de todos los agentes que corrieron
-    y genera el informe final estructurado en texto.
+    Nodo final. Construye un InformeScouting (Pydantic) con los resultados
+    de todos los agentes que corrieron y una conclusión generada por el LLM.
+    Serializa el informe a JSON para guardarlo en final_report del estado.
     """
-    print(f"\n[synthesis] Combinando resultados...")
+    print(f"\n[synthesis] Construyendo InformeScouting...")
 
-    sections = []
+    agentes = []
+    sections = {}
 
     if state.get("rag_results"):
         print("[synthesis] → incluyendo resultado RAG")
-        sections.append(f"## Jugadores sugeridos por perfil\n\n{state['rag_results'][0]}")
+        agentes.append("rag")
+        sections["rag"] = state["rag_results"][0]
 
     if state.get("stats_results"):
         print("[synthesis] → incluyendo resultado Stats")
-        sections.append(f"## Estadísticas\n\n{state['stats_results'][0]}")
+        agentes.append("stats")
+        sections["stats"] = state["stats_results"][0]
 
     if state.get("comp_results"):
-        print("[synthesis] → incluyendo resultado Comparativa")
-        sections.append(f"## Comparativa\n\n{state['comp_results'][0]}")
+        print("[synthesis] → incluyendo resultado Comp")
+        agentes.append("comp")
+        sections["comp"] = state["comp_results"][0]
 
-    final_report = "\n\n---\n\n".join(sections)
-    print(f"[synthesis] Informe generado ({len(final_report)} chars)")
+    conclusion = _generate_conclusion(state["query"], sections)
 
-    return {"final_report": final_report}
+    informe = InformeScouting(
+        query=state["query"],
+        agentes_ejecutados=agentes,
+        jugadores_sugeridos=sections.get("rag", ""),
+        estadisticas=sections.get("stats", ""),
+        comparativa=sections.get("comp", ""),
+        conclusion=conclusion,
+    )
+
+    print(f"[synthesis] InformeScouting construido")
+    return {"final_report": informe.model_dump_json()}
 
 
 # ── Compilación del graph ────────────────────────────────────────────────────
@@ -229,7 +285,7 @@ print("[graph] Graph compilado y listo.\n")
 
 # ── API pública ──────────────────────────────────────────────────────────────
 
-def run(query: str, thread_id: str = "default") -> str:
+def run(query: str, thread_id: str = "default") -> InformeScouting:
     """
     Punto de entrada principal. Ejecuta el graph completo para una query.
 
@@ -238,7 +294,7 @@ def run(query: str, thread_id: str = "default") -> str:
         thread_id: ID de conversación para MemorySaver (memoria entre queries).
 
     Returns:
-        Informe final como string.
+        InformeScouting con todos los campos estructurados.
     """
     config = {"configurable": {"thread_id": thread_id}}
     initial_state = {
@@ -255,4 +311,4 @@ def run(query: str, thread_id: str = "default") -> str:
     print(f"{'='*60}")
 
     result = graph.invoke(initial_state, config=config)
-    return result["final_report"]
+    return InformeScouting.model_validate_json(result["final_report"])
