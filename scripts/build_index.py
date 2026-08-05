@@ -32,7 +32,7 @@ def main():
     t0 = time.time()
     model = SentenceTransformer(MODEL_NAME)
     print(f"   Modelo listo en {time.time() - t0:.1f}s")
-    print(f"   Dimensiones del vector: {model.get_sentence_embedding_dimension()}\n")
+    print(f"   Dimensiones del vector: {model.get_embedding_dimension()}\n")
 
     print("3. Generando embeddings...")
     t0 = time.time()
