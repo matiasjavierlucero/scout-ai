@@ -55,13 +55,18 @@ def extract_events(match_ids: list[int]) -> pd.DataFrame:
 
 
 def compute_minutes_played(events: pd.DataFrame) -> pd.Series:
-    """Minutos jugados por jugador estimados desde eventos de sustitución."""
-    # Cada partido tiene 90 min base; usamos el minuto máximo de eventos del jugador
-    # como proxy (StatsBomb no tiene lineup_on/off directo en eventos).
-    player_minutes = (
-        events.groupby("player")["minute"].max().rename("minutes_played")
-    )
-    return player_minutes
+    """
+    Minutos jugados totales por jugador, sumando el minuto máximo por partido.
+
+    Lógica: para cada (jugador, partido) tomamos el minuto más alto en que
+    tuvo un evento — proxy de cuánto jugó en ese partido. Luego sumamos
+    esos valores across todos sus partidos para obtener el total acumulado.
+
+    Esto corrige el bug de usar max() global (que devolvía ~90 min sin importar
+    cuántos partidos jugó el jugador, inflando todas las stats por 90).
+    """
+    per_match = events.groupby(["player", "match_id"])["minute"].max()
+    return per_match.groupby("player").sum().rename("minutes_played")
 
 
 def aggregate_stats(events: pd.DataFrame) -> pd.DataFrame:
