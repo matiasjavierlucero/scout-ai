@@ -15,7 +15,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 DATA_DIR = Path(__file__).parent.parent / "data"
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 def main():

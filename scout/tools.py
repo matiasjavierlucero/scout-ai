@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 from sentence_transformers import SentenceTransformer
 
 DATA_DIR = Path(__file__).parent.parent / "data"
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 MINUTES_WARNING_THRESHOLD = 450  # menos de 5 partidos completos
 
 print("[tools] Cargando datos en memoria...")
