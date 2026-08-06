@@ -170,8 +170,16 @@ def _render_badges(agentes: list[str]) -> str:
     return badges
 
 
-def _render_informe(informe) -> None:
-    """Renderiza un InformeScouting en la interfaz."""
+def _render_informe(informe, stream_fn=None) -> None:
+    """
+    Renderiza un InformeScouting en la interfaz.
+
+    Args:
+        informe: El informe a renderizar.
+        stream_fn: Generator opcional para la conclusión. Si se provee, la conclusión
+                   aparece token a token via st.write_stream(). Si es None, se renderiza
+                   informe.conclusion directamente (para historial de mensajes).
+    """
     st.markdown(_render_badges(informe.agentes_ejecutados), unsafe_allow_html=True)
     st.markdown("")
 
@@ -187,9 +195,17 @@ def _render_informe(informe) -> None:
         with st.expander("⚖️ Comparativa", expanded=True):
             st.markdown(f"<div class='comp-table'>{informe.comparativa}</div>", unsafe_allow_html=True)
 
-    if informe.conclusion:
-        st.markdown("---")
-        st.markdown(f"<p style='color:#94a3b8;font-style:italic'>{informe.conclusion}</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    if stream_fn is not None:
+        # Nueva query: conclusión aparece token a token
+        conclusion_text = st.write_stream(stream_fn())
+        informe.conclusion = conclusion_text
+    elif informe.conclusion:
+        # Historial: conclusión ya guardada, renderizar directamente
+        st.markdown(
+            f"<p style='color:#94a3b8;font-style:italic'>{informe.conclusion}</p>",
+            unsafe_allow_html=True,
+        )
 
 
 # ── Historial de mensajes ─────────────────────────────────────────────────────
@@ -214,19 +230,25 @@ if query := st.chat_input("Describí un perfil, pedí stats o compará jugadores
 
     # Ejecutar el agente
     with st.chat_message("assistant", avatar="⚽"):
+        from scout.graph import run, stream_conclusion
+
+        # Fase 1: agentes paralelos (RAG, Stats, Comp) — bloqueante pero rápido
         with st.spinner("Analizando..."):
-            from scout.graph import run
             informe = run(query, context_players=st.session_state.last_players)
 
+        # Actualizar contexto conversacional con jugadores detectados
         if informe.jugadores_detectados:
-            # Insertar nuevos jugadores al frente, mantener hasta 2 únicos
             for p in reversed(informe.jugadores_detectados):
                 if p in st.session_state.last_players:
                     st.session_state.last_players.remove(p)
                 st.session_state.last_players.insert(0, p)
             st.session_state.last_players = st.session_state.last_players[:2]
 
-        _render_informe(informe)
+        # Fase 2: secciones aparecen de inmediato + conclusión en streaming
+        _render_informe(
+            informe,
+            stream_fn=lambda: stream_conclusion(query, informe),
+        )
 
     st.session_state.messages.append({"role": "assistant", "informe": informe})
     st.rerun()

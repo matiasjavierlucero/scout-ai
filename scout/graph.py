@@ -217,11 +217,12 @@ def comp_node(state: ScoutState) -> dict:
     return {"comp_results": [result]}
 
 
-def _generate_conclusion(query: str, sections: dict) -> str:
+def _build_conclusion_messages(query: str, sections: dict) -> list:
     """
-    Usa el LLM para generar una conclusión breve (2-3 oraciones) basada
-    en los resultados de los agentes. Temperature 0.3 para algo de variedad
-    sin perder coherencia. El prompt es intencionalmente corto y directo
+    Construye los mensajes para la llamada al LLM de conclusión.
+
+    Extraído para ser reutilizable tanto por la versión bloqueante (_generate_conclusion)
+    como por la versión streaming (stream_conclusion). El prompt es corto y directo
     para que llama3.2:3b lo siga sin inventar datos.
     """
     context_parts = []
@@ -232,9 +233,7 @@ def _generate_conclusion(query: str, sections: dict) -> str:
     if sections.get("comp"):
         context_parts.append(f"Comparativa:\n{sections['comp']}")
 
-    context = "\n\n".join(context_parts)
-
-    messages = [
+    return [
         SystemMessage(
             "Sos un analista de scouting. Escribí una conclusión de 2 a 3 oraciones "
             "basada SOLO en los datos que se te dan. No inventes estadísticas. "
@@ -242,23 +241,55 @@ def _generate_conclusion(query: str, sections: dict) -> str:
         ),
         HumanMessage(
             f"Query del usuario: {query}\n\n"
-            f"Datos disponibles:\n{context}\n\n"
+            f"Datos disponibles:\n{'\n\n'.join(context_parts)}\n\n"
             "Conclusión:"
         ),
     ]
 
-    print("[synthesis] Generando conclusión con LLM...")
-    response = _conclusion_llm.invoke(messages)
-    conclusion = response.content.strip()
-    print(f"[synthesis] Conclusión generada ({len(conclusion)} chars)")
-    return conclusion
+
+def stream_conclusion(query: str, informe: "InformeScouting"):
+    """
+    Generator que produce la conclusión token a token usando streaming del LLM.
+
+    Diseñado para ser pasado directamente a st.write_stream() de Streamlit:
+
+        conclusion_text = st.write_stream(stream_conclusion(query, informe))
+
+    El LLM recibe el mismo contexto que tendría con invoke() — la diferencia es
+    que los tokens llegan en tiempo real en vez de esperar a que la generación
+    complete. Con llama3.2:3b, esto convierte ~8s de silencio en texto apareciendo
+    palabra a palabra.
+
+    Args:
+        query: Query original del usuario (para contexto del prompt).
+        informe: InformeScouting con los campos ya populados por el graph
+                 (jugadores_sugeridos, estadisticas, comparativa).
+
+    Yields:
+        Fragmentos de texto (str) a medida que el LLM los genera.
+    """
+    sections = {
+        "rag": informe.jugadores_sugeridos,
+        "stats": informe.estadisticas,
+        "comp": informe.comparativa,
+    }
+    messages = _build_conclusion_messages(query, sections)
+
+    print("[conclusion] Iniciando streaming...")
+    for chunk in _conclusion_llm.stream(messages):
+        if chunk.content:
+            yield chunk.content
+    print("[conclusion] Streaming completado")
 
 
 def synthesis_node(state: ScoutState) -> dict:
     """
-    Nodo final. Construye un InformeScouting (Pydantic) con los resultados
-    de todos los agentes que corrieron y una conclusión generada por el LLM.
-    Serializa el informe a JSON para guardarlo en final_report del estado.
+    Nodo final. Construye un InformeScouting con los resultados de los agentes.
+
+    La conclusión NO se genera aquí — queda vacía y es responsabilidad de la capa
+    de presentación (app.py) generarla via stream_conclusion(). Esto permite que
+    el graph termine rápido y la UI muestre stats/comp/rag inmediatamente, mientras
+    la conclusión aparece token a token en paralelo.
     """
     print(f"\n[synthesis] Construyendo InformeScouting...")
 
@@ -280,19 +311,17 @@ def synthesis_node(state: ScoutState) -> dict:
         agentes.append("comp")
         sections["comp"] = state["comp_results"][0]
 
-    conclusion = _generate_conclusion(state["query"], sections)
-
     informe = InformeScouting(
         query=state["query"],
         agentes_ejecutados=agentes,
         jugadores_sugeridos=sections.get("rag", ""),
         estadisticas=sections.get("stats", ""),
         comparativa=sections.get("comp", ""),
-        conclusion=conclusion,
+        conclusion="",  # populado por stream_conclusion() en app.py
         jugadores_detectados=state.get("jugadores_detectados", []),
     )
 
-    print(f"[synthesis] InformeScouting construido")
+    print(f"[synthesis] InformeScouting construido (sin conclusión)")
     return {"final_report": informe.model_dump_json()}
 
 
