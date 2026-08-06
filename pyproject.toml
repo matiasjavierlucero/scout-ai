@@ -14,3 +14,11 @@ dependencies = [
     "statsbombpy>=1.22.0",
     "streamlit>=1.61.1",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

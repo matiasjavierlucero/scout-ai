@@ -18,7 +18,7 @@ from typing import Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
-from langgraph.constants import Send
+from langgraph.types import Send
 from langgraph.graph import END, START, StateGraph
 
 from scout.agents import run_comp_agent, run_rag_agent, run_stats_agent
