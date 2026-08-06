@@ -14,6 +14,7 @@ Heurísticas de routing:
 """
 
 import operator
+import re
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -48,7 +49,9 @@ class ScoutState(TypedDict):
     comp_results:       Annotated[list[str], operator.add]
     final_report:       str
     jugadores_detectados: list[str]  # jugadores resueltos en el orchestrator
+    rag_players:          list[str]  # jugadores del resultado RAG en orden (para guardar en app)
     context_players:    list[str]    # jugadores del turno anterior (inyectado desde app)
+    rag_context:        list[str]    # jugadores del último RAG del turno anterior (inyectado desde app)
 
 
 # ── Heurísticas de routing ───────────────────────────────────────────────────
@@ -57,6 +60,75 @@ _COMP_KEYWORDS = {
     "compará", "compara", "comparación", "versus", "vs", "contra",
     "diferencia", "mejor que", "peor que", "frente a",
 }
+
+# Mapa de palabras ordinales → índice 0-based en la lista de resultados RAG.
+# Permite resolver "el primer jugador que me ofreciste" → rag_context[0].
+_ORDINAL_MAP: dict[str, int] = {
+    "primero": 0, "primer": 0, "primera": 0,
+    "segundo": 1, "segunda": 1,
+    "tercero": 2, "tercera": 2,
+    "cuarto":  3, "cuarta":  3,
+    "quinto":  4, "quinta":  4,
+}
+
+# Palabras que indican intención de ver estadísticas de un jugador específico,
+# usadas junto con la detección ordinal para evitar falsos positivos.
+_STATS_INTENT_KEYWORDS = {
+    "estadísticas", "estadisticas", "stats", "métricas", "metricas",
+    "rendimiento", "datos", "números", "numeros", "información", "info",
+    "háblame", "hablame", "cuéntame", "cuentame",
+}
+
+
+def _extract_rag_player_names(rag_text: str) -> list[str]:
+    """
+    Extrae los nombres de jugadores del output de buscar_jugadores en orden de similitud.
+
+    El formato del output es:
+      "  1. Ikechukwu Uche — Right Center Forward — similitud: 0.452"
+      "  2. Ustaritz Aldekoaotalora Astarloa — Right Center Back — similitud: 0.450"
+
+    Devuelve una lista de nombres ["Ikechukwu Uche", "Ustaritz Aldekoaotalora Astarloa", ...]
+    para guardar como contexto y resolver referencias ordinales en el turno siguiente.
+    """
+    pattern = re.compile(r"^\s+\d+\.\s+(.+?)\s+—")
+    names = []
+    for line in rag_text.splitlines():
+        match = pattern.match(line)
+        if match:
+            names.append(match.group(1).strip())
+    return names
+
+
+def _resolve_ordinal_reference(query: str, rag_context: list[str]) -> str | None:
+    """
+    Resuelve referencias del tipo "el primer jugador que me ofreciste" → nombre real.
+
+    Condiciones para activar la resolución:
+      1. La query contiene una palabra ordinal del _ORDINAL_MAP.
+      2. La query contiene al menos una palabra de intención de stats (_STATS_INTENT_KEYWORDS).
+      3. El índice ordinal existe dentro de rag_context.
+
+    Exigir ambas condiciones evita falsos positivos: "el primero era muy rápido,
+    dame otro similar" tiene ordinal pero NO intención de stats → sigue siendo RAG.
+
+    Returns:
+        Nombre del jugador resuelto, o None si no se cumplen las condiciones.
+    """
+    if not rag_context:
+        return None
+
+    query_lower = query.lower()
+
+    has_stats_intent = any(kw in query_lower for kw in _STATS_INTENT_KEYWORDS)
+    if not has_stats_intent:
+        return None
+
+    for term, idx in _ORDINAL_MAP.items():
+        if term in query_lower and idx < len(rag_context):
+            return rag_context[idx]
+
+    return None
 
 
 def _load_index_names() -> list[str]:
@@ -147,20 +219,36 @@ def orchestrator_node(state: ScoutState) -> dict:
     """
     Nodo inicial. Analiza la query, resuelve jugadores y guarda la decisión en el estado.
 
-    Si needs_comp=True pero solo se detectó 1 jugador (o ninguno), inyecta el jugador
-    del turno anterior (context_players) como primer elemento. Esto permite queries
-    como "comparalo con Ronaldo" después de haber preguntado por Messi.
+    Resolución de referencias en orden de prioridad:
+
+    1. Referencia ordinal + intención de stats ("el primer jugador que me ofreciste"):
+       Si la query no contiene nombres pero tiene un ordinal ("primer", "segundo"...)
+       y palabras de stats ("estadísticas", "info", etc.), se resuelve contra rag_context
+       (los jugadores del último resultado RAG) y se redirige a stats_node.
+
+    2. Comparación con contexto ("comparalo con Ronaldo", "comparalos"):
+       Si needs_comp=True pero se detectó ≤1 jugador, se completa con context_players
+       (jugadores del turno anterior, cualquier tipo de respuesta).
     """
     print(f"\n[orchestrator] Query recibida: '{state['query']}'")
     routing, players = _detect_routing(state["query"])
 
+    rag_context = state.get("rag_context", [])
     context = state.get("context_players", [])
+
+    # ── Resolución 1: referencia ordinal al resultado RAG anterior ────────────
+    if routing["needs_rag"] and rag_context:
+        resolved = _resolve_ordinal_reference(state["query"], rag_context)
+        if resolved:
+            players = [resolved]
+            routing = {"needs_rag": False, "needs_stats": True, "needs_comp": False}
+            print(f"[orchestrator] Referencia ordinal resuelta → '{resolved}'")
+
+    # ── Resolución 2: comparación con contexto conversacional ─────────────────
     if routing["needs_comp"] and len(players) <= 1 and context:
         if len(players) == 1:
-            # Un jugador nuevo + el anterior del contexto como primer elemento
             players = [context[0]] + players
         else:
-            # Cero jugadores detectados (query tipo "comparalos") — usar los dos del contexto
             players = context[:2]
         print(f"[orchestrator] Contexto inyectado: {context[:2]}")
 
@@ -188,10 +276,18 @@ def route_to_agents(state: ScoutState) -> list[Send]:
 
 
 def rag_node(state: ScoutState) -> dict:
-    """Nodo del agente RAG. Ejecuta búsqueda semántica y devuelve resultado."""
+    """
+    Nodo del agente RAG. Ejecuta búsqueda semántica y devuelve resultado.
+
+    Además del texto, extrae los nombres de los jugadores en orden para guardarlos
+    como rag_players en el estado. La app los persiste en last_rag_results para que
+    el orchestrator pueda resolver referencias ordinales en el turno siguiente.
+    """
     print(f"\n[rag_node] Ejecutando...")
     result = run_rag_agent(state["query"])
-    return {"rag_results": [result]}
+    player_names = _extract_rag_player_names(result)
+    print(f"[rag_node] Jugadores extraídos del resultado: {player_names}")
+    return {"rag_results": [result], "rag_players": player_names}
 
 
 def stats_node(state: ScoutState) -> dict:
@@ -319,6 +415,7 @@ def synthesis_node(state: ScoutState) -> dict:
         comparativa=sections.get("comp", ""),
         conclusion="",  # populado por stream_conclusion() en app.py
         jugadores_detectados=state.get("jugadores_detectados", []),
+        rag_players=state.get("rag_players", []),
     )
 
     print(f"[synthesis] InformeScouting construido (sin conclusión)")
@@ -372,6 +469,7 @@ print("[graph] Graph compilado y listo.\n")
 def run(
     query: str,
     context_players: list[str] | None = None,
+    rag_context: list[str] | None = None,
 ) -> InformeScouting:
     """
     Punto de entrada principal. Ejecuta el graph completo para una query.
@@ -396,7 +494,9 @@ def run(
         "comp_results": [],
         "final_report": "",
         "jugadores_detectados": [],
+        "rag_players": [],
         "context_players": context_players or [],
+        "rag_context": rag_context or [],
     }
 
     print(f"\n{'='*60}")

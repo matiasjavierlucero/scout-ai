@@ -17,6 +17,7 @@ class InformeScouting(BaseModel):
     comparativa: str = Field(default="", description="Resultado del agente Comp")
     conclusion: str = Field(default="", description="Conclusión generada por el LLM")
     jugadores_detectados: list[str] = Field(default_factory=list, description="Jugadores resueltos en esta query")
+    rag_players: list[str] = Field(default_factory=list, description="Jugadores del resultado RAG en orden de similitud")
 
     def display(self) -> str:
         """Formatea el informe completo para mostrar en terminal."""

@@ -129,6 +129,9 @@ if "history" not in st.session_state:
 if "last_players" not in st.session_state:
     st.session_state.last_players = []
 
+if "last_rag_results" not in st.session_state:
+    st.session_state.last_rag_results = []
+
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -234,15 +237,23 @@ if query := st.chat_input("Describí un perfil, pedí stats o compará jugadores
 
         # Fase 1: agentes paralelos (RAG, Stats, Comp) — bloqueante pero rápido
         with st.spinner("Analizando..."):
-            informe = run(query, context_players=st.session_state.last_players)
+            informe = run(
+                query,
+                context_players=st.session_state.last_players,
+                rag_context=st.session_state.last_rag_results,
+            )
 
-        # Actualizar contexto conversacional con jugadores detectados
+        # Actualizar contexto de jugadores detectados por nombre
         if informe.jugadores_detectados:
             for p in reversed(informe.jugadores_detectados):
                 if p in st.session_state.last_players:
                     st.session_state.last_players.remove(p)
                 st.session_state.last_players.insert(0, p)
             st.session_state.last_players = st.session_state.last_players[:2]
+
+        # Guardar jugadores del RAG para resolver referencias ordinales en el turno siguiente
+        if informe.rag_players:
+            st.session_state.last_rag_results = informe.rag_players
 
         # Fase 2: secciones aparecen de inmediato + conclusión en streaming
         _render_informe(
