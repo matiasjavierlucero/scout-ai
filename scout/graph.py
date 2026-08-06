@@ -23,6 +23,7 @@ from langgraph.constants import Send
 from langgraph.graph import END, START, StateGraph
 
 from scout.agents import run_comp_agent, run_rag_agent, run_stats_agent
+from scout.tools import _name_to_minutes
 from scout.schemas import InformeScouting
 
 _conclusion_llm = ChatOllama(model="llama3.2:3b", temperature=0.3)
@@ -106,8 +107,12 @@ def _detect_routing(query: str) -> tuple[dict[str, bool], list[str]]:
         if overlapping:
             scored_matches.append((name, overlapping))
 
-    # Ordenar por tokens en común — más tokens = match más específico
-    scored_matches.sort(key=lambda x: len(x[1]), reverse=True)
+    # Ordenar por: (tokens en común DESC, minutos jugados DESC)
+    # El desempate por minutos resuelve "Cristiano" → Ronaldo > Biraghi
+    scored_matches.sort(
+        key=lambda x: (len(x[1]), _name_to_minutes.get(x[0], 0)),
+        reverse=True,
+    )
 
     print(f"[routing] Top matches: {[(n, t) for n, t in scored_matches[:3]]}")
 
@@ -152,10 +157,13 @@ def orchestrator_node(state: ScoutState) -> dict:
 
     context = state.get("context_players", [])
     if routing["needs_comp"] and len(players) <= 1 and context:
-        # Falta un jugador para comparar — tomamos el del turno anterior
-        injected = context[0]
-        players = [injected] + players
-        print(f"[orchestrator] Contexto inyectado: '{injected}'")
+        if len(players) == 1:
+            # Un jugador nuevo + el anterior del contexto como primer elemento
+            players = [context[0]] + players
+        else:
+            # Cero jugadores detectados (query tipo "comparalos") — usar los dos del contexto
+            players = context[:2]
+        print(f"[orchestrator] Contexto inyectado: {context[:2]}")
 
     return {"routing": routing, "jugadores_detectados": players}
 

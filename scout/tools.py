@@ -26,6 +26,11 @@ print("[tools] Cargando datos en memoria...")
 _stats_df = pd.read_csv(DATA_DIR / "player_stats.csv")
 print(f"[tools]   player_stats.csv cargado — {len(_stats_df)} jugadores")
 
+# Índice de minutos para desempate en routing (más minutos = jugador más prominente)
+_name_to_minutes: dict[str, int] = dict(
+    zip(_stats_df["name"], _stats_df["minutes_played"].astype(int))
+)
+
 with open(DATA_DIR / "player_profiles.json", encoding="utf-8") as f:
     _profiles = json.load(f)
 print(f"[tools]   player_profiles.json cargado — {len(_profiles)} perfiles")

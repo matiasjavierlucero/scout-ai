@@ -219,7 +219,12 @@ if query := st.chat_input("Describí un perfil, pedí stats o compará jugadores
             informe = run(query, context_players=st.session_state.last_players)
 
         if informe.jugadores_detectados:
-            st.session_state.last_players = informe.jugadores_detectados
+            # Insertar nuevos jugadores al frente, mantener hasta 2 únicos
+            for p in reversed(informe.jugadores_detectados):
+                if p in st.session_state.last_players:
+                    st.session_state.last_players.remove(p)
+                st.session_state.last_players.insert(0, p)
+            st.session_state.last_players = st.session_state.last_players[:2]
 
         _render_informe(informe)
 
