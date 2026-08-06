@@ -18,7 +18,6 @@ from typing import Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import Send
 from langgraph.graph import END, START, StateGraph
 
@@ -300,7 +299,15 @@ def synthesis_node(state: ScoutState) -> dict:
 # ── Compilación del graph ────────────────────────────────────────────────────
 
 def build_graph():
-    """Construye y compila el graph con MemorySaver checkpointer."""
+    """
+    Construye y compila el graph SIN checkpointer.
+
+    No usamos MemorySaver porque cada query debe ser completamente stateless —
+    el contexto multi-turno está manejado explícitamente vía context_players en
+    initial_state. Con MemorySaver + operator.add, los resultados de queries
+    anteriores (comp_results, stats_results) se acumulan y contaminan queries
+    nuevas, haciendo aparecer comparativas donde no corresponde.
+    """
     workflow = StateGraph(ScoutState)
 
     workflow.add_node("orchestrator", orchestrator_node)
@@ -324,8 +331,7 @@ def build_graph():
     workflow.add_edge("comp_node", "synthesis")
     workflow.add_edge("synthesis", END)
 
-    checkpointer = MemorySaver()
-    return workflow.compile(checkpointer=checkpointer)
+    return workflow.compile()
 
 
 graph = build_graph()
@@ -336,21 +342,23 @@ print("[graph] Graph compilado y listo.\n")
 
 def run(
     query: str,
-    thread_id: str = "default",
     context_players: list[str] | None = None,
 ) -> InformeScouting:
     """
     Punto de entrada principal. Ejecuta el graph completo para una query.
 
+    Cada invocación es completamente stateless — el graph no retiene nada entre
+    llamadas. El contexto multi-turno (jugadores del turno anterior) se pasa
+    explícitamente via context_players desde la capa de UI.
+
     Args:
         query: Pregunta o descripción del usuario en lenguaje natural.
-        thread_id: ID de conversación para MemorySaver (memoria entre queries).
-        context_players: Jugadores del turno anterior para resolver follow-ups.
+        context_players: Jugadores del turno anterior para resolver follow-ups
+                         como "comparalo con Ronaldo" o "y sus stats?".
 
     Returns:
         InformeScouting con todos los campos estructurados.
     """
-    config = {"configurable": {"thread_id": thread_id}}
     initial_state = {
         "query": query,
         "routing": {},
@@ -366,5 +374,5 @@ def run(
     print(f"SCOUT AI — Query: {query}")
     print(f"{'='*60}")
 
-    result = graph.invoke(initial_state, config=config)
+    result = graph.invoke(initial_state)
     return InformeScouting.model_validate_json(result["final_report"])
