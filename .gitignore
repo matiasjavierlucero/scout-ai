@@ -1,7 +1,6 @@
 .venv/
 __pycache__/
 *.pyc
-data/
 .env
 CLAUDE.md
-/data
+data/wikipedia_cache.json
