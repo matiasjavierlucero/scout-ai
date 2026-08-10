@@ -14,19 +14,17 @@ Cada agente es un graph compilado que maneja el loop ReAct internamente:
 
 from langchain.agents import create_agent
 from langchain_core.messages import ToolMessage
-from langchain_ollama import ChatOllama
 
+from scout.llm import make_llm
 from scout.tools import (
     buscar_jugadores,
     comparar_jugadores,
     stats_jugador,
 )
 
-MODEL = "llama3.2:3b"
-
-print(f"[agents] Inicializando modelo {MODEL}...")
-_llm = ChatOllama(model=MODEL, temperature=0)
-print(f"[agents] Modelo listo.\n")
+print("[agents] Inicializando modelo...")
+_llm = make_llm(temperature=0)
+print(f"[agents] Modelo listo: {type(_llm).__name__}\n")
 
 
 rag_agent = create_agent(

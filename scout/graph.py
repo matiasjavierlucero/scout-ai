@@ -18,15 +18,15 @@ import re
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_ollama import ChatOllama
 from langgraph.types import Send
 from langgraph.graph import END, START, StateGraph
 
 from scout.agents import run_comp_agent, run_rag_agent, run_stats_agent
+from scout.llm import make_llm
 from scout.tools import _name_to_minutes
 from scout.schemas import InformeScouting
 
-_conclusion_llm = ChatOllama(model="llama3.2:3b", temperature=0.3)
+_conclusion_llm = make_llm(temperature=0.3)
 
 # ── Stopwords que ignoramos al detectar nombres de jugadores ─────────────────
 
