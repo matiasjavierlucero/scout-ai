@@ -1,11 +1,12 @@
 """
 Factory de LLM con auto-detección del entorno.
 
-En producción (Streamlit Cloud u otro hosting):
-  - Si ANTHROPIC_API_KEY está presente → usa Claude claude-haiku-4-5-20251001
+Prioridad:
+  1. GROQ_API_KEY → ChatGroq (llama-3.1-8b-instant) — gratis, rápido, tool calling
+  2. Sin API key  → ChatOllama (llama3.2:3b) — solo desarrollo local
 
-En desarrollo local:
-  - Si no hay ANTHROPIC_API_KEY → usa Ollama (llama3.2:3b en localhost:11434)
+Groq free tier: 30 RPM, 14.400 req/día — suficiente para un demo/portfolio.
+Registrate en https://console.groq.com para obtener una API key gratis.
 
 Uso:
   from scout.llm import make_llm
@@ -15,27 +16,29 @@ Uso:
 import os
 
 
+GROQ_MODEL = "llama-3.1-8b-instant"
+OLLAMA_MODEL = "llama3.2:3b"
+
+
 def make_llm(temperature: float = 0):
     """
     Retorna un ChatModel configurado según el entorno.
 
     Args:
-        temperature: Controla la aleatoriedad de las respuestas.
-                     0 = determinista (para tools/razonamiento).
-                     0.3 = levemente creativo (para conclusiones).
+        temperature: 0 = determinista (agents/tools), 0.3 = creativo (conclusiones).
     """
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    groq_key = os.getenv("GROQ_API_KEY")
 
-    if api_key:
-        from langchain_anthropic import ChatAnthropic
+    if groq_key:
+        from langchain_groq import ChatGroq
 
-        return ChatAnthropic(
-            model="claude-haiku-4-5-20251001",
+        return ChatGroq(
+            model=GROQ_MODEL,
             temperature=temperature,
-            api_key=api_key,
+            api_key=groq_key,
         )
 
-    # Fallback local — requiere Ollama corriendo en localhost:11434
+    # Fallback local — requiere Ollama en localhost:11434
     from langchain_ollama import ChatOllama
 
-    return ChatOllama(model="llama3.2:3b", temperature=temperature)
+    return ChatOllama(model=OLLAMA_MODEL, temperature=temperature)
