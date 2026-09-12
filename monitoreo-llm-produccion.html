@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scout AI — Arquitectura & Prep Entrevista</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0f14;
+    --bg-card:  #13161e;
+    --bg-input: #1a1d27;
+    --border:   #1f2330;
+    --border2:  #2d3347;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --muted2:   #475569;
+    --blue:     #3b82f6;
+    --blue-d:   #1d4ed8;
+    --purple:   #8b5cf6;
+    --green:    #10b981;
+    --orange:   #f97316;
+    --yellow:   #f59e0b;
+    --red:      #ef4444;
+    --cyan:     #06b6d4;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  .chip {
+    display: inline-block;
+    background: var(--bg-input);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+
+  h1 { font-size: 2rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; margin-bottom: 6px; }
+  h2 { font-size: 1.15rem; font-weight: 600; color: var(--text); margin-bottom: 16px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 40px; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 16px; }
+
+  .diagram-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 16px;
+    overflow-x: auto;
+    margin-bottom: 32px;
+  }
+  .diagram-wrap .mermaid { display: flex; justify-content: center; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 32px; }
+  .legend-item {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 12px; font-size: 0.78rem; color: var(--muted);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  .timeline { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+  .tl-item {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 12px 0; border-left: 2px solid var(--border2);
+    margin-left: 8px; padding-left: 24px; position: relative;
+  }
+  .tl-item:last-child { border-left-color: transparent; }
+  .tl-dot {
+    position: absolute; left: -6px; top: 18px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--blue); border: 2px solid var(--bg-card);
+  }
+  .tl-time { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.05em; min-width: 48px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .tl-content { flex: 1; }
+  .tl-title { color: var(--text); font-size: 0.88rem; font-weight: 500; }
+  .tl-desc { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+
+  .qa-grid { display: flex; flex-direction: column; gap: 10px; }
+
+  .qa-item {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; transition: border-color 0.2s;
+  }
+  .qa-item:hover { border-color: var(--border2); }
+  .qa-item.open { border-color: var(--blue-d); }
+
+  .qa-q {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; cursor: pointer; gap: 12px; user-select: none;
+  }
+  .qa-q:hover { background: var(--bg-input); }
+
+  .qa-tag {
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 3px; flex-shrink: 0;
+  }
+  .tag-arch { background: #1e3a5f; color: var(--blue); }
+  .tag-llm  { background: #2d1f4e; color: var(--purple); }
+  .tag-data { background: #063b2f; color: var(--green); }
+  .tag-prod { background: #3d1a00; color: var(--orange); }
+  .tag-eval { background: #3d2600; color: var(--yellow); }
+
+  .qa-q-text { color: var(--text); font-size: 0.9rem; font-weight: 500; flex: 1; }
+  .qa-arrow { color: var(--muted); font-size: 0.8rem; transition: transform 0.2s; flex-shrink: 0; }
+  .qa-item.open .qa-arrow { transform: rotate(90deg); }
+
+  .qa-a {
+    display: none; padding: 0 20px 20px;
+    color: var(--muted); font-size: 0.88rem; line-height: 1.7;
+    border-top: 1px solid var(--border);
+  }
+  .qa-item.open .qa-a { display: block; padding-top: 16px; }
+
+  .qa-a strong { color: var(--text); }
+  .qa-a code {
+    background: var(--bg-input); border: 1px solid var(--border2); border-radius: 3px;
+    padding: 1px 5px; font-size: 0.82rem; color: var(--cyan);
+  }
+  .qa-a .highlight {
+    background: var(--bg-input); border-left: 3px solid var(--blue);
+    border-radius: 0 4px 4px 0; padding: 10px 14px; margin: 10px 0; font-size: 0.85rem;
+  }
+  .qa-a .warn {
+    background: #3d1a00; border-left: 3px solid var(--orange);
+    border-radius: 0 4px 4px 0; padding: 10px 14px; margin: 10px 0;
+    font-size: 0.85rem; color: #fbbf24;
+  }
+
+  .section-label {
+    color: var(--muted); font-size: 0.72rem; letter-spacing: 0.1em;
+    text-transform: uppercase; margin-bottom: 16px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .filter-pill {
+    cursor: pointer; padding: 5px 14px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+    border: 1px solid var(--border2); background: transparent; color: var(--muted);
+    transition: all 0.15s;
+  }
+  .filter-pill:hover { background: var(--bg-input); color: var(--text); }
+  .filter-pill.active { color: var(--text); border-color: var(--blue); background: #1e3a5f; }
+
+  .mermaid svg { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="chip">Scout AI · La Liga · StatsBomb</div>
+  <h1>Arquitectura del Sistema</h1>
+  <p class="subtitle">Flujo completo de una query &nbsp;·&nbsp; Decisiones de diseño &nbsp;·&nbsp; Prep entrevista AI Engineer</p>
+
+  <!-- DIAGRAM -->
+  <p class="section-label">Flujo de una query — de inicio a respuesta</p>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+  classDef user   fill:#1a2035,stroke:#3b82f6,color:#e2e8f0
+  classDef app    fill:#13161e,stroke:#6366f1,color:#e2e8f0
+  classDef orch   fill:#13161e,stroke:#8b5cf6,color:#e2e8f0
+  classDef agent  fill:#13161e,stroke:#06b6d4,color:#e2e8f0
+  classDef data   fill:#0a1f17,stroke:#10b981,color:#e2e8f0
+  classDef synth  fill:#13161e,stroke:#f59e0b,color:#e2e8f0
+  classDef trace  fill:#1a0f0f,stroke:#ef4444,color:#fca5a5
+  classDef output fill:#1a2035,stroke:#3b82f6,color:#e2e8f0
+
+  U(["👤 Usuario\nescribe una query"]):::user
+  U -->|"Streamlit chat input"| APP
+
+  APP["📱 app.py\nCrea un CallbackHandler por query\nEnvuelve todo en un Langfuse span"]:::app
+  APP -.->|"trace automático\nde todo el flujo"| LF
+  LF(["🔭 Langfuse Cloud\nlatencia · tokens · spans"]):::trace
+  APP -->|"run(query, callbacks)"| ORCH
+
+  subgraph GRAPH ["  scout/graph.py — LangGraph  "]
+    direction TB
+    ORCH["🎯 orchestrator_node\nheurísticas en menos de 1ms\nsin gastar un solo token de LLM"]:::orch
+    ORCH --> ROUTE
+    ROUTE{{"route_to_agents\nSend API — paralelo"}}:::orch
+    ROUTE -->|"needs_rag"| RAG
+    ROUTE -->|"needs_stats"| STATS
+    ROUTE -->|"needs_comp"| COMP
+    RAG["🔍 RAG Agent\ncreate_react_agent\nbuscar_jugadores"]:::agent
+    STATS["📊 Stats Agent\ncreate_react_agent\nstats_jugador"]:::agent
+    COMP["⚖️ Comp Agent\ncreate_react_agent\ncomparar_jugadores"]:::agent
+    RAG --> SYN
+    STATS --> SYN
+    COMP --> SYN
+    SYN["🔧 synthesis_node\nInformeScouting Pydantic\nconclusión vacía — se llena después"]:::synth
+  end
+
+  RAG -->|"embedding + coseno"| EMB
+  STATS -->|"fuzzy match + CSV"| CSV
+  COMP -->|"fuzzy match + CSV"| CSV
+  EMB[("🧠 Embeddings\n1885 jugadores x 384 dims")]:::data
+  CSV[("📋 player_stats.csv\n1885 jugadores normalizados /90")]:::data
+
+  GRAPH -->|"InformeScouting"| SC
+  SC["✍️ stream_conclusion\nLLM streamed token a token\nno bloquea la UI mientras carga"]:::app
+  SC --> UI
+  UI(["📊 Respuesta visual\ncards · radar · stats · conclusión"]):::output
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#6366f1"></div> app.py — UI Streamlit</div>
+    <div class="legend-item"><div class="dot" style="background:#8b5cf6"></div> Orquestador + Graph (LangGraph)</div>
+    <div class="legend-item"><div class="dot" style="background:#06b6d4"></div> Agentes (create_react_agent)</div>
+    <div class="legend-item"><div class="dot" style="background:#10b981"></div> Datos en disco (RAM en runtime)</div>
+    <div class="legend-item"><div class="dot" style="background:#f59e0b"></div> Síntesis + Output estructurado</div>
+    <div class="legend-item"><div class="dot" style="background:#ef4444"></div> Langfuse (observabilidad)</div>
+  </div>
+
+  <hr>
+
+  <!-- STARTUP -->
+  <p class="section-label">Arranque del sistema — qué pasa al correr <code style="font-size:0.7rem;color:#06b6d4;background:#1a1d27;padding:2px 6px;border-radius:3px">streamlit run app.py</code></p>
+
+  <div class="card">
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-time">~2s</div>
+        <div class="tl-content">
+          <div class="tl-title">📋 player_stats.csv + player_profiles.json + index.json → RAM</div>
+          <div class="tl-desc">1885 jugadores. Los datos ya están pre-procesados — no hay llamadas a StatsBomb en runtime.</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-time">~22s</div>
+        <div class="tl-content">
+          <div class="tl-title">🧠 Modelo de embeddings — paraphrase-multilingual-MiniLM-L12-v2</div>
+          <div class="tl-desc">384 dimensiones, multilingüe. Entiende que "mediocampista" y "midfielder" son equivalentes. Se carga una sola vez.</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-time">~1s</div>
+        <div class="tl-content">
+          <div class="tl-title">🎯 LangGraph compila el graph + carga índice de 1885 nombres</div>
+          <div class="tl-desc">El índice sirve para el routing: detectar en microsegundos si la query menciona un jugador conocido.</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot" style="background:var(--green)"></div>
+        <div class="tl-time">✓ listo</div>
+        <div class="tl-content">
+          <div class="tl-title">Sistema listo — las queries son rápidas porque todo ya está en RAM</div>
+          <div class="tl-desc">El modelo de embeddings, el CSV y el graph solo se inicializan al arrancar, no por query.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- EVALS -->
+  <p class="section-label">El directorio <code style="font-size:0.7rem;color:#06b6d4;background:#1a1d27;padding:2px 6px;border-radius:3px">evals/</code> — sistema de evaluación automática</p>
+
+  <div class="card" style="border-color:#2d2a00;margin-bottom:12px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:1.4rem;flex-shrink:0">💡</span>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">¿Son obligatorios para correr la app?</div>
+        <div style="color:var(--muted);font-size:0.87rem;line-height:1.7">
+          <strong style="color:#f59e0b">No.</strong> La app funciona completamente sin ellos. Los evals no se ejecutan en runtime — son una herramienta de desarrollo, como los tests unitarios. Corren <em>antes</em> de deployar, no durante el uso normal. Si nunca los corrés, Scout AI funciona igual.
+          <br>Lo que perdés sin evals: <strong style="color:var(--text)">no sabés si un cambio en el código empeoró la calidad de las respuestas</strong> hasta que alguien se queja.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px">
+    <div class="card" style="padding:18px;margin-bottom:0">
+      <div style="color:var(--cyan);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">golden_set.py</div>
+      <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:6px">10 queries con ground truth</div>
+      <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+        4 RAG · 3 Stats · 3 Comp<br>
+        Cada query tiene: agentes esperados, keywords obligatorias, jugadores que deben aparecer, timeout máximo.<br>
+        <span style="color:var(--muted2)">Escrito a mano — es la fuente de verdad.</span>
+      </div>
+    </div>
+    <div class="card" style="padding:18px;margin-bottom:0">
+      <div style="color:var(--green);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">sanity.py</div>
+      <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:6px">7 checks determinísticos</div>
+      <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+        Sin LLM · microsegundos · 100% reproducibles.<br>
+        ¿Tiene contenido? ¿Agentes correctos? ¿Keywords presentes? ¿Stats en rango? ¿Respondió a tiempo?<br>
+        <span style="color:var(--muted2)">Primera línea de defensa.</span>
+      </div>
+    </div>
+    <div class="card" style="padding:18px;margin-bottom:0;border-color:#3d2600">
+      <div style="color:var(--yellow);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">llm_judge.py ⚠️</div>
+      <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:6px">LLM como juez de calidad</div>
+      <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+        Evalúa relevancia, grounding y coherencia.<br>
+        Lento · opcional · activar con <code>--judge</code>.<br>
+        <span style="color:#f59e0b">Usa el mismo modelo que el agente → self-serving bias → scores no confiables.</span>
+      </div>
+    </div>
+    <div class="card" style="padding:18px;margin-bottom:0">
+      <div style="color:var(--purple);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">run_evals.py</div>
+      <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:6px">CLI + CI gate</div>
+      <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+        Corre los 10 casos, imprime el resumen, envía scores a Langfuse.<br>
+        <span style="color:var(--green)">Exit code 0</span> si pasa · <span style="color:var(--red)">Exit code 1</span> si falla.<br>
+        <span style="color:var(--muted2)">Integrable en GitHub Actions / CI.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">Cómo correr los evals</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:12px 16px">
+        <div style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Solo sanity checks (rápido, sin LLM)</div>
+        <code style="color:var(--cyan);font-size:0.85rem;background:none;border:none;padding:0">uv run python evals/run_evals.py</code>
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:12px 16px">
+        <div style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Con LLM-as-judge (lento, scores orientativos)</div>
+        <code style="color:var(--cyan);font-size:0.85rem;background:none;border:none;padding:0">uv run python evals/run_evals.py --judge</code>
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:12px 16px">
+        <div style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Un solo caso para debug rápido</div>
+        <code style="color:var(--cyan);font-size:0.85rem;background:none;border:none;padding:0">uv run python evals/run_evals.py --case stats-001</code>
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:12px 16px">
+        <div style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Threshold personalizado (default: 0.7)</div>
+        <code style="color:var(--cyan);font-size:0.85rem;background:none;border:none;padding:0">uv run python evals/run_evals.py --threshold 0.85</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:0;padding:20px 24px">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">Pipeline completo de una corrida de evals</div>
+    <div style="display:flex;flex-direction:column;gap:0">
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--purple);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:80px;color:var(--muted);font-size:0.75rem;padding-top:2px">golden_set</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Carga los 10 casos</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Cada caso tiene la query, lo que se espera y el timeout máximo. Ground truth manual — no cambia automáticamente.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:80px;color:var(--muted);font-size:0.75rem;padding-top:2px">graph.run()</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Ejecuta cada query contra el sistema real</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Invoca el mismo <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">run()</code> que usa la app. No hay mocks — es el sistema de producción.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:80px;color:var(--muted);font-size:0.75rem;padding-top:2px">sanity.py</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">7 checks rule-based sobre el InformeScouting</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">has_content · agentes_correctos · keywords_presentes · jugadores_mencionados · stats_en_rango · schema_completo · response_time. Cada check devuelve un score 0.0–1.0.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--yellow);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:80px;color:var(--muted);font-size:0.75rem;padding-top:2px">llm_judge</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Evaluación LLM — solo con <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">--judge</code></div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Si no se activa la flag, este paso se salta completamente. No afecta el score final ni el exit code.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--orange);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:80px;color:var(--muted);font-size:0.75rem;padding-top:2px">Langfuse</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Envía scores por caso + promedio global</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Si no hay keys configuradas, se loguea un mensaje y sigue. Nunca rompe el script.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid transparent;margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:80px;color:var(--muted);font-size:0.75rem;padding-top:2px">exit code</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Score promedio ≥ threshold → exit 0 &nbsp;·&nbsp; Score < threshold → exit 1</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">El threshold default es 0.7. Exit code 1 bloquea un deploy en GitHub Actions si el workflow lo chequea.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- SCOUT/ -->
+  <p class="section-label">El directorio <code style="font-size:0.7rem;color:#06b6d4;background:#1a1d27;padding:2px 6px;border-radius:3px">scout/</code> — el núcleo del sistema</p>
+
+  <div class="card" style="border-color:#1a2035;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:1.4rem;flex-shrink:0">🧠</span>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">Cada archivo tiene una responsabilidad única y clara</div>
+        <div style="color:var(--muted);font-size:0.87rem;line-height:1.7">
+          Los archivos tienen una cadena de dependencias: <strong style="color:var(--text)">schemas → llm → tools → agents → graph</strong>. Los últimos tres son el corazón — tools tiene los datos, agents coordina el uso de tools, graph coordina los agents. <code>tracing.py</code> y <code>viz.py</code> son ortogonales: se enchufan sin modificar la lógica central.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:#0d1b2e;border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div style="color:var(--blue);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">schemas.py</div>
+        <div style="color:var(--muted);font-size:0.7rem">Contrato de salida</div>
+      </div>
+      <div style="padding:14px 18px">
+        <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:5px">Define <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 5px;border-radius:3px">InformeScouting</code> — el modelo Pydantic que devuelve el sistema</div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">Tiene 8 campos: la query original, qué agentes corrieron, el texto de cada agente (RAG/stats/comp), la conclusión, y las listas de jugadores detectados. Los campos de agentes no ejecutados quedan como string vacío — nunca hay None. Este schema es el único punto donde el sistema define su API pública.</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:#0d1b2e;border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div style="color:var(--blue);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">llm.py</div>
+        <div style="color:var(--muted);font-size:0.7rem">Factory de LLM</div>
+      </div>
+      <div style="padding:14px 18px">
+        <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:5px">Una función <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 5px;border-radius:3px">make_llm()</code> que elige el provider según las env vars</div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+          Prioridad en orden: <strong style="color:var(--text)">LiteLLM → Groq → Ollama</strong>.<br>
+          <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">LITELLM_MODEL=groq/llama-3.1-8b-instant</code> → Groq gratis en producción.<br>
+          Sin env vars → Ollama local en <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">localhost:11434</code>. El código de agents y graph nunca sabe qué provider está corriendo.
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:0;background:var(--bg-card);border:1px solid #1a3a2e;border-radius:10px;overflow:hidden">
+      <div style="background:#0a1f17;border-right:1px solid #1a3a2e;padding:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div style="color:var(--green);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">tools.py</div>
+        <div style="color:var(--muted);font-size:0.7rem">Capa de datos</div>
+      </div>
+      <div style="padding:14px 18px">
+        <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:5px">4 tools — la única capa que toca los datos reales</div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+          <strong style="color:var(--text)">buscar_jugadores(query)</strong> — RAG: embedding de la query + similitud coseno contra los 1885 vectores. Devuelve los k más similares.<br>
+          <strong style="color:var(--text)">stats_jugador(nombre)</strong> — lookup fuzzy en el CSV, devuelve stats /90 con advertencia si &lt;450 min.<br>
+          <strong style="color:var(--text)">comparar_jugadores(a, b)</strong> — tabla lado a lado con marcador al mejor en cada métrica.<br>
+          <strong style="color:var(--text)">buscar_por_nombre(nombre)</strong> — hasta 5 candidatos para que el agente resuelva ambigüedad antes de pedir stats.
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:0;background:var(--bg-card);border:1px solid #1a2d3a;border-radius:10px;overflow:hidden">
+      <div style="background:#061824;border-right:1px solid #1a2d3a;padding:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div style="color:var(--cyan);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">agents.py</div>
+        <div style="color:var(--muted);font-size:0.7rem">3 agentes ReAct</div>
+      </div>
+      <div style="padding:14px 18px">
+        <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:5px">Cada agente es un <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 5px;border-radius:3px">create_react_agent</code> con sus tools específicas</div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+          <strong style="color:var(--text)">RAG agent</strong> → solo tiene <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">buscar_jugadores</code>. Responde queries de perfil.<br>
+          <strong style="color:var(--text)">Stats agent</strong> → tiene <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">buscar_por_nombre</code> + <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">stats_jugador</code>. Resuelve ambigüedad antes de buscar stats.<br>
+          <strong style="color:var(--text)">Comp agent</strong> → tiene <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">buscar_por_nombre</code> + <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">comparar_jugadores</code>.<br>
+          Fix crítico: el output del agente se extrae del <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">ToolMessage</code>, no del texto final del LLM — porque llama3.2:3b parafrasea y a veces inventa.
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:0;background:var(--bg-card);border:1px solid #2d1f4e;border-radius:10px;overflow:hidden">
+      <div style="background:#160d2e;border-right:1px solid #2d1f4e;padding:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div style="color:var(--purple);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">graph.py</div>
+        <div style="color:var(--muted);font-size:0.7rem">El orquestador</div>
+      </div>
+      <div style="padding:14px 18px">
+        <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:5px">El StateGraph de LangGraph que conecta todo</div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+          <strong style="color:var(--text)">orchestrator_node</strong>: heurísticas en &lt;1ms para decidir qué agentes invocar.<br>
+          <strong style="color:var(--text)">route_to_agents</strong>: edge condicional que devuelve <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">Send</code> objects — activa agentes en paralelo.<br>
+          <strong style="color:var(--text)">synthesis_node</strong>: fan-in, construye el <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">InformeScouting</code> con los resultados.<br>
+          <strong style="color:var(--text)">run()</strong>: función pública que acepta <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">callbacks</code> para Langfuse y retorna el informe.
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:0;background:var(--bg-card);border:1px solid #1f0f0f;border-radius:10px;overflow:hidden">
+      <div style="background:#1a0a0a;border-right:1px solid #1f0f0f;padding:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div style="color:#ef4444;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">tracing.py</div>
+        <div style="color:var(--muted);font-size:0.7rem">Observabilidad</div>
+      </div>
+      <div style="padding:14px 18px">
+        <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:5px">Singleton de Langfuse + factory del CallbackHandler</div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+          <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">get_langfuse()</code> retorna el cliente o <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">None</code> si no hay keys — nunca rompe el flujo.<br>
+          <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">get_callback_handler()</code> crea una instancia nueva por query — cada query genera un trace independiente.<br>
+          Acepta <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">LANGFUSE_BASE_URL</code> o <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">LANGFUSE_HOST</code> para US/EU region.
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:#13161e;border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div style="color:var(--muted);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">viz.py</div>
+        <div style="color:var(--muted);font-size:0.7rem">Visualizaciones</div>
+      </div>
+      <div style="padding:14px 18px">
+        <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:5px">Figuras Plotly para el dashboard — no tiene lógica de negocio</div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
+          <strong style="color:var(--text)">build_radar(data_a, data_b?)</strong> — radar de percentiles de un jugador o superpuesto para dos. Los percentiles se calculan contra el dataset completo de 1885 jugadores.<br>
+          <strong style="color:var(--text)">build_pitch(position)</strong> — campo de fútbol con la zona de la posición resaltada.<br>
+          <strong style="color:var(--text)">get_player_data(name)</strong> — lookup en el CSV para enriquecer los cards del dashboard.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <hr>
+
+  <!-- SCRIPTS/ -->
+  <p class="section-label">El directorio <code style="font-size:0.7rem;color:#06b6d4;background:#1a1d27;padding:2px 6px;border-radius:3px">scripts/</code> — pipeline de datos offline</p>
+
+  <div class="card" style="border-color:#063b2f;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:1.4rem;flex-shrink:0">⚡</span>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">¿Necesitás correr estos scripts?</div>
+        <div style="color:var(--muted);font-size:0.87rem;line-height:1.7">
+          <strong style="color:var(--green)">Probablemente no.</strong> Ya corrieron una sola vez y generaron los archivos en <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 5px;border-radius:3px">data/</code> que están commiteados al repo. La app arranca directamente desde esos archivos — no descarga nada de StatsBomb en runtime. Solo necesitás re-correrlos si querés regenerar los datos desde cero (por ejemplo, para agregar nuevas temporadas o un dataset diferente).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px;padding:20px 24px">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px">Orden de ejecución — si necesitás regenerar desde cero</div>
+
+    <div style="display:flex;flex-direction:column;gap:0">
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;flex-shrink:0">
+          <div style="color:var(--green);font-size:0.75rem;font-weight:600">Paso 1</div>
+          <div style="color:var(--muted);font-size:0.72rem">~30–60 min</div>
+        </div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500;margin-bottom:4px">build_player_profiles.py</div>
+          <div style="color:var(--muted);font-size:0.79rem;line-height:1.6;margin-bottom:8px">Descarga todos los eventos de La Liga (15 temporadas, miles de partidos) desde StatsBomb Open Data via <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">statsbombpy</code>. Agrega pases, tiros, presiones y recuperaciones por jugador, normaliza a /90 min, genera un perfil textual por jugador. Produce <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">player_stats.csv</code> y <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">player_profiles.json</code>.</div>
+          <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 12px">
+            <code style="color:var(--cyan);font-size:0.82rem">uv run python scripts/build_player_profiles.py</code>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--yellow);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;flex-shrink:0">
+          <div style="color:var(--yellow);font-size:0.75rem;font-weight:600">Paso 2 (opcional)</div>
+          <div style="color:var(--muted);font-size:0.72rem">~20 min</div>
+        </div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500;margin-bottom:4px">enrich_profiles_wikipedia.py</div>
+          <div style="color:var(--muted);font-size:0.79rem;line-height:1.6;margin-bottom:6px">Enriquece los perfiles con contexto biográfico de Wikipedia. Sin esto, una query como <em>"delantero argentino que revolucionó el fútbol"</em> devuelve resultados mediocres — los perfiles solo tienen stats, no historia. Con Wikipedia agrega nacionalidad, historia y contexto narrativo al vector de cada jugador.</div>
+          <div style="background:#3d2600;border:1px solid #5a3a00;border-radius:5px;padding:8px 12px;margin-bottom:8px;font-size:0.79rem;color:#fbbf24">
+            ⚡ Tarda 0.3s por jugador para no saturar la API de Wikipedia. Usa cache en <code style="font-size:0.78rem;background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:2px">data/wikipedia_cache.json</code> — si se interrumpe, continúa donde quedó.
+          </div>
+          <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 12px">
+            <code style="color:var(--cyan);font-size:0.82rem">uv run python scripts/enrich_profiles_wikipedia.py</code>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-left:2px solid transparent;margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;flex-shrink:0">
+          <div style="color:var(--blue);font-size:0.75rem;font-weight:600">Paso 3</div>
+          <div style="color:var(--muted);font-size:0.72rem">~22s</div>
+        </div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500;margin-bottom:4px">build_index.py</div>
+          <div style="color:var(--muted);font-size:0.79rem;line-height:1.6;margin-bottom:8px">Carga <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">player_profiles.json</code>, genera un embedding de 384 dimensiones por jugador usando <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">paraphrase-multilingual-MiniLM-L12-v2</code>, y guarda la matriz y el mapeo nombre→índice. Produce <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">embeddings.npy</code> (2.65 MB) + <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">index.json</code>. El mismo modelo que usa el sistema en runtime — consistencia garantizada.</div>
+          <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 12px">
+            <code style="color:var(--cyan);font-size:0.82rem">uv run python scripts/build_index.py</code>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:0;border-color:#1a3a2e">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Archivos generados → usados en runtime</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:10px 14px">
+        <div style="color:var(--cyan);font-size:0.8rem;font-weight:500;margin-bottom:3px">player_stats.csv</div>
+        <div style="color:var(--muted);font-size:0.77rem">1885 jugadores · stats /90 · lo usan <code style="font-size:0.75rem;color:var(--cyan);background:#0d0f14;padding:1px 3px;border-radius:2px">tools.py</code> y <code style="font-size:0.75rem;color:var(--cyan);background:#0d0f14;padding:1px 3px;border-radius:2px">viz.py</code></div>
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:10px 14px">
+        <div style="color:var(--cyan);font-size:0.8rem;font-weight:500;margin-bottom:3px">player_profiles.json</div>
+        <div style="color:var(--muted);font-size:0.77rem">Perfil textual por jugador · input de <code style="font-size:0.75rem;color:var(--cyan);background:#0d0f14;padding:1px 3px;border-radius:2px">build_index.py</code></div>
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:10px 14px">
+        <div style="color:var(--cyan);font-size:0.8rem;font-weight:500;margin-bottom:3px">embeddings.npy</div>
+        <div style="color:var(--muted);font-size:0.77rem">1885 × 384 floats · cargado al RAM en el arranque · búsqueda en &lt;1ms</div>
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;padding:10px 14px">
+        <div style="color:var(--cyan);font-size:0.8rem;font-weight:500;margin-bottom:3px">index.json</div>
+        <div style="color:var(--muted);font-size:0.77rem">Nombre → posición en la matriz · también sirve para el routing del orquestador</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- OBSERVABILIDAD -->
+  <p class="section-label">Observabilidad — cómo leer el dashboard de Langfuse</p>
+
+  <div class="card" style="border-color:#1a2035;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:1.4rem;flex-shrink:0">🔭</span>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">¿Qué problema resuelve tener observabilidad?</div>
+        <div style="color:var(--muted);font-size:0.87rem;line-height:1.7">
+          Sin observabilidad, cuando una respuesta es mala la única pregunta que podés responder es "¿qué devolvió el sistema?". Con Langfuse podés responder: <strong style="color:var(--text)">¿qué hizo exactamente cada agente, cuánto tardó cada paso, qué le pasó al LLM, y qué devolvió cada tool?</strong> La diferencia es la distancia entre un sistema que "parece funcionar" y uno del que sos responsable en producción.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Jerarquía de spans -->
+  <div class="card" style="margin-bottom:12px">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Anatomía de un trace — tipos reales que muestra Langfuse</div>
+    <div style="color:var(--muted);font-size:0.78rem;margin-bottom:14px">Verificado contra un trace real. Los tipos aparecen como íconos y etiquetas en la columna Type de la tabla.</div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:var(--muted)"><span style="color:#3b82f6;font-size:0.68rem;border:1px solid #3b82f6;padding:1px 6px;border-radius:3px;font-weight:600">AGENT</span> span raíz o el LLM del agente ReAct</div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:var(--muted)"><span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 6px;border-radius:3px;font-weight:600">CHAIN</span> nodos de LangGraph (orchestrator, rag_node, synthesis…)</div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:var(--muted)"><span style="color:#f59e0b;font-size:0.68rem;border:1px solid #f59e0b;padding:1px 6px;border-radius:3px;font-weight:600">GENERATION</span> llamada real al modelo (input/output tokens, latencia del LLM)</div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:var(--muted)"><span style="color:#10b981;font-size:0.68rem;border:1px solid #10b981;padding:1px 6px;border-radius:3px;font-weight:600">TOOL</span> ejecución de una tool (0 tokens, siempre &lt;1ms)</div>
+    </div>
+
+    <div style="font-family:monospace;font-size:0.82rem;line-height:2">
+
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#0d1b2e;border-radius:6px;margin-bottom:2px">
+        <span style="color:#3b82f6;font-size:0.68rem;border:1px solid #3b82f6;padding:1px 5px;border-radius:3px;font-weight:600">AGENT</span>
+        <span style="color:var(--text);font-weight:600">scout-query</span>
+        <span style="color:var(--muted);margin-left:auto;font-size:0.78rem">latencia total de la query completa</span>
+      </div>
+
+      <div style="padding-left:24px;border-left:1px solid var(--border2);margin-left:12px">
+
+        <div style="display:flex;align-items:center;gap:10px;padding:5px 10px;margin-bottom:2px">
+          <span style="color:var(--muted);font-size:0.72rem;min-width:32px">├──</span>
+          <span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 5px;border-radius:3px;font-weight:600">CHAIN</span>
+          <span style="color:var(--muted)">LangGraph</span>
+          <span style="color:var(--muted2);margin-left:auto;font-size:0.77rem">wrapper del graph completo</span>
+        </div>
+
+        <div style="padding-left:24px;border-left:1px solid var(--border);margin-left:36px">
+
+          <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:2px">
+            <span style="color:var(--muted);font-size:0.72rem;min-width:32px">├──</span>
+            <span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 5px;border-radius:3px;font-weight:600">CHAIN</span>
+            <span style="color:var(--text)">orchestrator</span>
+            <span style="color:var(--green);margin-left:auto;font-size:0.77rem">&lt;1ms · 0 tokens · output: routing flags</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:2px">
+            <span style="color:var(--muted);font-size:0.72rem;min-width:32px">├──</span>
+            <span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 5px;border-radius:3px;font-weight:600">CHAIN</span>
+            <span style="color:var(--text)">route_to_agents</span>
+            <span style="color:var(--muted2);margin-left:auto;font-size:0.77rem">Send API — decide qué nodos activar</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:2px">
+            <span style="color:var(--muted);font-size:0.72rem;min-width:32px">├──</span>
+            <span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 5px;border-radius:3px;font-weight:600">CHAIN</span>
+            <span style="color:var(--text)">rag_node</span>
+            <span style="color:var(--muted);margin-left:auto;font-size:0.77rem">agente RAG completo (ReAct loop)</span>
+          </div>
+
+          <div style="padding-left:24px;border-left:1px solid var(--border);margin-left:36px">
+            <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:2px">
+              <span style="color:var(--muted);font-size:0.72rem;min-width:32px">├──</span>
+              <span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 5px;border-radius:3px;font-weight:600">CHAIN</span>
+              <span style="color:var(--muted)">LangGraph</span>
+              <span style="color:var(--muted2);margin-left:auto;font-size:0.77rem">mini-graph interno del create_react_agent</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:2px">
+              <span style="color:var(--muted);font-size:0.72rem;min-width:32px">│ &nbsp;├──</span>
+              <span style="color:#3b82f6;font-size:0.68rem;border:1px solid #3b82f6;padding:1px 5px;border-radius:3px;font-weight:600">AGENT</span>
+              <span style="color:var(--muted)">ChatOllama</span>
+              <span style="color:var(--muted2);margin-left:auto;font-size:0.77rem">decide qué tool llamar</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:2px">
+              <span style="color:var(--muted);font-size:0.72rem;min-width:32px">│ &nbsp;│ └──</span>
+              <span style="color:#f59e0b;font-size:0.68rem;border:1px solid #f59e0b;padding:1px 5px;border-radius:3px;font-weight:600">GENERATION</span>
+              <span style="color:var(--muted)">model</span>
+              <span style="color:var(--muted2);margin-left:auto;font-size:0.77rem">tokens de entrada + salida · latencia real del LLM</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:2px">
+              <span style="color:var(--muted);font-size:0.72rem;min-width:32px">│ &nbsp;├──</span>
+              <span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 5px;border-radius:3px;font-weight:600">CHAIN</span>
+              <span style="color:var(--muted)">tools</span>
+              <span style="color:var(--muted2);margin-left:auto;font-size:0.77rem">wrapper de ejecución de tools</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:4px 10px">
+              <span style="color:var(--muted);font-size:0.72rem;min-width:32px">│ &nbsp;└──</span>
+              <span style="color:#10b981;font-size:0.68rem;border:1px solid #10b981;padding:1px 5px;border-radius:3px;font-weight:600">TOOL</span>
+              <span style="color:var(--muted)">buscar_jugadores("mediocampista ofensivo…")</span>
+              <span style="color:var(--green);margin-left:auto;font-size:0.77rem">0.3s · 0 tokens · similitud coseno</span>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-top:2px">
+            <span style="color:var(--muted);font-size:0.72rem;min-width:32px">└──</span>
+            <span style="color:#8b5cf6;font-size:0.68rem;border:1px solid #8b5cf6;padding:1px 5px;border-radius:3px;font-weight:600">CHAIN</span>
+            <span style="color:var(--text)">synthesis</span>
+            <span style="color:var(--muted2);margin-left:auto;font-size:0.77rem">construye InformeScouting · sin LLM</span>
+          </div>
+
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;padding:5px 10px;margin-top:2px">
+          <span style="color:var(--muted);font-size:0.72rem;min-width:32px">└──</span>
+          <span style="color:#3b82f6;font-size:0.68rem;border:1px solid #3b82f6;padding:1px 5px;border-radius:3px;font-weight:600">AGENT</span>
+          <span style="color:var(--text)">ChatOllama</span>
+          <span style="color:var(--muted);margin-left:auto;font-size:0.78rem">stream_conclusion — conclusión en streaming</span>
+        </div>
+
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+      <div style="padding:10px 14px;background:var(--bg-input);border-radius:6px;font-size:0.8rem;color:var(--muted)">
+        💡 <strong style="color:var(--text)">GENERATION es el único span con costo real:</strong> es la llamada directa al modelo — ahí ves input tokens, output tokens y latencia del LLM. Un CHAIN o AGENT que lo envuelve incluye ese tiempo más overhead de LangGraph, que es insignificante.
+      </div>
+      <div style="padding:10px 14px;background:var(--bg-input);border-radius:6px;font-size:0.8rem;color:var(--muted)">
+        💡 <strong style="color:var(--text)">TOOL siempre es &lt;1ms y 0 tokens:</strong> es código Python puro (lookup en DataFrame o similitud coseno en NumPy). Si ves una TOOL lenta, el problema es de I/O o de datos, no del LLM.
+      </div>
+    </div>
+  </div>
+
+  <!-- Métricas clave -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
+    <div class="card" style="padding:18px;margin-bottom:0">
+      <div style="color:var(--blue);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Latencia</div>
+      <div style="color:var(--muted);font-size:0.82rem;line-height:1.7">
+        <strong style="color:var(--text)">Total:</strong> cuánto tardó la query entera.<br>
+        <strong style="color:var(--text)">Por agente:</strong> qué nodo fue el cuello de botella.<br>
+        <strong style="color:var(--text)">Tool vs LLM:</strong> si el LLM es lento, el provider tiene latencia alta. Si la tool es lenta, hay un problema de datos.
+      </div>
+    </div>
+    <div class="card" style="padding:18px;margin-bottom:0">
+      <div style="color:var(--purple);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Tokens y costo</div>
+      <div style="color:var(--muted);font-size:0.82rem;line-height:1.7">
+        <strong style="color:var(--text)">Input tokens:</strong> contexto + historial + tool results.<br>
+        <strong style="color:var(--text)">Output tokens:</strong> respuesta del LLM.<br>
+        Langfuse calcula el costo por query según el modelo — útil para presupuestar antes de escalar.
+      </div>
+    </div>
+    <div class="card" style="padding:18px;margin-bottom:0">
+      <div style="color:var(--orange);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Sessions</div>
+      <div style="color:var(--muted);font-size:0.82rem;line-height:1.7">
+        En la vista Sessions de Langfuse se pueden agrupar traces de una misma conversación usando un <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">session_id</code>. Actualmente cada query genera un trace independiente — agruparlos por sesión es una mejora futura de observabilidad.
+      </div>
+    </div>
+    <div class="card" style="padding:18px;margin-bottom:0">
+      <div style="color:var(--yellow);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Scores de evals</div>
+      <div style="color:var(--muted);font-size:0.82rem;line-height:1.7">
+        Cuando corrés <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">run_evals.py</code>, los scores de sanity y judge se envían a Langfuse con el <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">eval_run_id</code>. En la pestaña Scores del dashboard podés ver la evolución del score promedio entre corridas.
+      </div>
+    </div>
+  </div>
+
+  <!-- Guía de debugging -->
+  <div class="card" style="margin-bottom:0">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px">Guía de debugging — qué mirás primero según el síntoma</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;overflow:hidden">
+        <div style="padding:8px 14px;border-right:1px solid var(--border2)"><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em">Síntoma</span></div>
+        <div style="padding:8px 14px;border-right:1px solid var(--border2)"><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em">Dónde mirar</span></div>
+        <div style="padding:8px 14px"><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em">Qué buscar</span></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--text)">La respuesta tiene datos incorrectos</div>
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--cyan)">Span del agente → ToolMessage</div>
+        <div style="padding:10px 14px;font-size:0.82rem;color:var(--muted)">Compará el ToolMessage (dato crudo de la tool) con lo que imprimió el LLM. Si difieren, el LLM parafraseó mal.</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--text)">La query tardó demasiado</div>
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--cyan)">Vista Timeline del trace</div>
+        <div style="padding:10px 14px;font-size:0.82rem;color:var(--muted)">Identificá qué agente o llamada de LLM fue el cuello de botella. Si un LLM tarda >5s, el problema es el provider, no el código.</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--text)">Corrió el agente equivocado</div>
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--cyan)">Span orchestrator_node</div>
+        <div style="padding:10px 14px;font-size:0.82rem;color:var(--muted)">Mirá qué flags seteó el orquestador (<code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 3px;border-radius:2px">needs_rag</code>, <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 3px;border-radius:2px">needs_stats</code>, <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 3px;border-radius:2px">needs_comp</code>). El problema está en la heurística de routing.</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--text)">No encontró al jugador</div>
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--cyan)">Tool buscar_por_nombre → output</div>
+        <div style="padding:10px 14px;font-size:0.82rem;color:var(--muted)">Mirá qué nombre mandó el agente a la tool y qué devolvió el fuzzy match. Puede ser un apodo sin caracteres en común con el nombre oficial.</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--text)">El score de evals bajó entre versiones</div>
+        <div style="padding:10px 14px;border-right:1px solid var(--border);font-size:0.82rem;color:var(--cyan)">Langfuse → Scores → filtrar por eval_run</div>
+        <div style="padding:10px 14px;font-size:0.82rem;color:var(--muted)">Compará <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 3px;border-radius:2px">sanity_score</code> por caso entre los dos runs. El caso que bajó te dice exactamente qué tipo de query empeoró.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Q&A -->
+  <p class="section-label">Preguntas de entrevista — con respuestas preparadas</p>
+
+  <div class="filter-bar">
+    <button class="filter-pill active" onclick="filterQA('all',this)">Todas (13)</button>
+    <button class="filter-pill" onclick="filterQA('arch',this)">Arquitectura</button>
+    <button class="filter-pill" onclick="filterQA('llm',this)">LLM / Agentes</button>
+    <button class="filter-pill" onclick="filterQA('data',this)">Datos</button>
+    <button class="filter-pill" onclick="filterQA('prod',this)">Producción</button>
+    <button class="filter-pill" onclick="filterQA('eval',this)">Evals</button>
+  </div>
+
+  <div class="qa-grid" id="qa-grid">
+
+    <!-- ARQUITECTURA -->
+    <div class="qa-item" data-tag="arch">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-arch">Arquitectura</span>
+        <span class="qa-q-text">¿Por qué usaste LangGraph y no construiste el loop de agentes manualmente?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>LangGraph te da resuelto lo que tardarías días en reimplementar bien:</p>
+        <div class="highlight">
+          El <strong>ReAct loop</strong> (razonar → actuar → observar), la propagación automática de callbacks de observabilidad a todos los nodos, el paralelismo con la Send API, y la gestión de estado compartido con type-checking.
+        </div>
+        <p>Si implementás el loop manualmente, empezás bien y a los tres días estás peleando con el estado entre agentes, los errores silenciosos y el debug. LangGraph tiene ese battle-testing hecho.</p>
+        <p style="margin-top:10px;color:#94a3b8;font-size:0.82rem">💡 Dato clave: el proyecto anterior incluía implementar el ReAct loop a mano. LangGraph es exactamente eso, pero production-ready.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="arch">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-arch">Arquitectura</span>
+        <span class="qa-q-text">¿Cómo funciona el routing del orquestador? ¿Por qué no usás un LLM para decidir qué agentes invocar?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>El orquestador usa <strong>heurísticas determinísticas en &lt;1ms</strong>:</p>
+        <div class="highlight">
+          1. Busca keywords de comparación ("compará", "vs", "diferencia") → activa el agente Comp<br>
+          2. Detecta tokens que coinciden con nombres del índice de 1885 jugadores → activa Stats<br>
+          3. Si no encontró nada específico → búsqueda semántica por perfil (RAG)
+        </div>
+        <p>Usar un LLM para el routing agregaría <strong>1-3 segundos de latencia en TODAS las queries</strong>, con no-determinismo incluido. Las heurísticas son predecibles y cuando fallan es fácil corregirlas.</p>
+        <p style="margin-top:10px;color:#94a3b8;font-size:0.82rem">💡 Principio en juego: si algo se puede resolver con código determinístico, no gastes tokens de LLM en eso.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="arch">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-arch">Arquitectura</span>
+        <span class="qa-q-text">¿Qué es la Send API de LangGraph y por qué la usás?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>La <strong>Send API</strong> permite que un nodo dispare mensajes a múltiples nodos al mismo tiempo. LangGraph los ejecuta en paralelo y el nodo <code>synthesis</code> espera a que todos terminen (patrón fan-out → fan-in).</p>
+        <div class="highlight">
+          Sin Send API (secuencial): RAG (8s) + Stats (8s) + Comp (8s) = <strong>24 segundos</strong><br>
+          Con Send API (paralelo): max(RAG, Stats, Comp) = <strong>~8 segundos</strong>
+        </div>
+        <p>Cada agente es completamente independiente — no depende del resultado del anterior — así que el paralelismo es seguro. El estado compartido usa <code>operator.add</code> para que cada agente escriba sus resultados sin pisar al otro.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="arch">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-arch">Arquitectura</span>
+        <span class="qa-q-text">¿Por qué no usás MemorySaver para el contexto multi-turno?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Decisión contraintuitiva que vale la pena entender bien.</p>
+        <p>MemorySaver persiste el estado entre invocaciones usando <code>operator.add</code>, que <strong>acumula listas</strong>. Si en el turno 1 el agente Comp devolvió una comparativa, en el turno 2 ese resultado sigue en el estado — y el nodo synthesis lo incluye en el informe aunque el usuario no haya pedido una comparación.</p>
+        <div class="highlight">
+          El contexto multi-turno se maneja <strong>explícitamente</strong>: la app guarda los jugadores del turno anterior en <code>session_state</code> de Streamlit y los pasa como parámetros limpios en cada nueva invocación del graph. Cada run empieza con estado vacío.
+        </div>
+        <p>Esto da control total sobre qué se recuerda y qué no, sin efectos secundarios del estado acumulado.</p>
+      </div>
+    </div>
+
+    <!-- LLM / AGENTES -->
+    <div class="qa-item" data-tag="llm">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-llm">LLM / Agentes</span>
+        <span class="qa-q-text">¿Qué es un agente ReAct y cómo funciona dentro de LangGraph?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>ReAct es un patrón donde el LLM alterna entre <strong>R</strong>azonar y <strong>Act</strong>uar hasta que tiene suficiente información para responder:</p>
+        <div class="highlight">
+          1. El LLM recibe la query y decide qué herramienta (tool) llamar<br>
+          2. La tool se ejecuta y devuelve el resultado<br>
+          3. El LLM procesa el resultado y decide si necesita más info o puede responder<br>
+          4. Se repite hasta que decide que tiene suficiente
+        </div>
+        <p>En LangGraph, <code>create_react_agent</code> compila este loop como un mini-graph. Cada uno de los tres agentes (RAG, Stats, Comp) es uno de estos mini-graphs que corre dentro del graph principal.</p>
+        <p style="margin-top:10px;color:#94a3b8;font-size:0.82rem">💡 Problema con llama3.2:3b: parafrasea el output de las tools y a veces inventa datos al hacerlo. El fix: se extrae el <code>ToolMessage</code> directamente de la conversación, saltando el texto final del LLM.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="llm">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-llm">LLM / Agentes</span>
+        <span class="qa-q-text">¿Cómo garantizás que el agente no invente estadísticas (hallucinations)?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Tres mecanismos en capas:</p>
+        <div class="highlight">
+          <strong>1. Bypass del LLM para los datos:</strong> el resultado de la tool se toma directamente del <code>ToolMessage</code>, no del texto final que generó el LLM. Lo que el LLM "dice" sobre el resultado es irrelevante — usamos el dato crudo de la tool.<br><br>
+          <strong>2. System prompt restrictivo:</strong> "Siempre mostrá los resultados de la tool directamente, sin inventar información adicional".<br><br>
+          <strong>3. Sanity checks en evals:</strong> validamos que los valores numéricos estén en rangos físicamente posibles (xG/90 entre 0 y 2, pases/90 entre 0 y 150, etc.).
+        </div>
+        <p>El principio: el LLM es el coordinador, no la fuente de verdad. Los datos vienen del CSV. El LLM solo decide cuándo y cómo presentarlos.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="llm">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-llm">LLM / Agentes</span>
+        <span class="qa-q-text">¿Qué problema resuelve LiteLLM y cómo está implementado?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Sin LiteLLM, cambiar de Ollama (dev local) a Claude (producción) requiere cambiar código: distintas clases, distintos parámetros, distintas API keys hardcodeadas.</p>
+        <div class="highlight">
+          LiteLLM unifica todos los providers bajo una única interfaz. El modelo se especifica con un string con prefijo de provider:<br><br>
+          <code>LITELLM_MODEL=ollama/llama3.2:3b</code> → Ollama local (dev)<br>
+          <code>LITELLM_MODEL=groq/llama-3.1-8b-instant</code> → Groq (staging, gratis)<br>
+          <code>LITELLM_MODEL=claude-sonnet-4-6</code> → Claude (producción)
+        </div>
+        <p>El código del agente no cambia. Solo cambia una variable de entorno. Eso es lo que querés en producción: configuración separada del código.</p>
+      </div>
+    </div>
+
+    <!-- DATOS -->
+    <div class="qa-item" data-tag="data">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-data">Datos</span>
+        <span class="qa-q-text">¿Qué es RAG y cómo está implementado en Scout AI?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p><strong>RAG</strong> (Retrieval-Augmented Generation) es recuperar información relevante de una base de datos antes de generar la respuesta, en vez de que el LLM intente inventar o recordar los datos.</p>
+        <div class="highlight">
+          <strong>Paso offline (una sola vez):</strong> generamos un perfil textual para cada jugador ("Lionel Messi: Forward, 2000 min, xG/90: 0.55, pases/90: 67…"). Convertimos ese texto a un vector de 384 números con sentence-transformers y lo guardamos en disco.<br><br>
+          <strong>Paso runtime (por query):</strong> la query del usuario ("mediocentro defensivo que recupere balones") se convierte al mismo espacio vectorial. Calculamos similitud coseno contra los 1885 vectores y devolvemos los k más cercanos.
+        </div>
+        <p>Esto permite encontrar jugadores por <strong>perfil de juego en lenguaje natural</strong>, no solo por nombre exacto.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="data">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-data">Datos</span>
+        <span class="qa-q-text">¿Por qué embeddings multilingüe? ¿Por qué ese modelo en particular?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Hay dos idiomas en juego: los perfiles de jugadores están en <strong>inglés</strong> (posiciones en StatsBomb: "Right Center Midfielder", etc.), pero los usuarios escriben en <strong>español</strong>.</p>
+        <div class="highlight">
+          Un modelo monolingüe (inglés) no entendería que "mediocampista" y "midfielder" son lo mismo. El modelo <code>paraphrase-multilingual-MiniLM-L12-v2</code> fue entrenado en 50+ idiomas y mapea esos conceptos al mismo lugar en el espacio vectorial.
+        </div>
+        <p>¿Por qué MiniLM y no algo más grande? Tradeoff consciente: corre en CPU en ~1 segundo, tiene 384 dimensiones (suficiente para este dominio) y es multilingüe. Un modelo más grande sería marginalmente mejor pero incompatible con el objetivo de correr todo localmente sin GPU.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="data">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-data">Datos</span>
+        <span class="qa-q-text">¿Por qué normalizás las estadísticas a "por 90 minutos"?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Sin normalización, un jugador que jugó 3000 minutos tendría en total muchos más goles y pases que uno que jugó 500 minutos, aunque el segundo sea claramente mejor.</p>
+        <div class="highlight">
+          Dividir por minutos jugados × 90 convierte los totales en <strong>tasas por partido completo</strong>. Esto hace comparables a jugadores con volúmenes de juego muy distintos: un titular de toda la temporada vs uno que vino del banco.
+        </div>
+        <p>El sistema también advierte cuando un jugador tiene menos de 450 minutos (menos de 5 partidos). Con tan poca data, un buen partido puede inflar los números artificialmente. Se muestra la advertencia pero no se filtra: esa decisión la toma el scout, no el sistema.</p>
+      </div>
+    </div>
+
+    <!-- PRODUCCIÓN -->
+    <div class="qa-item" data-tag="prod">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-prod">Producción</span>
+        <span class="qa-q-text">¿Qué problema resuelve Langfuse en producción y cómo está integrado?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Sin observabilidad, cuando algo falla no podés responder "¿qué hizo exactamente el sistema?". En un banco esto no es opcional — es compliance.</p>
+        <div class="highlight">
+          Langfuse graba por cada query:<br><br>
+          • Cuánto tardó cada agente (RAG, Stats, Comp, conclusión)<br>
+          • Qué tokens usó y cuánto costó<br>
+          • Qué tool llamó el agente y qué devolvió<br>
+          • El trace completo con todos los mensajes
+        </div>
+        <p><strong>Integración minimal:</strong> un <code>CallbackHandler</code> se pasa como <code>config={"callbacks": [handler]}</code> al <code>graph.invoke()</code>. LangGraph propaga ese callback automáticamente a todos los nodos y agentes internos — <strong>sin tocar el código de los agentes</strong>. Un punto de instrumentación, cobertura total.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="prod">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-prod">Producción</span>
+        <span class="qa-q-text">¿Qué pasa cuando el usuario escribe un nombre incompleto o un apodo?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Las tools usan <strong>fuzzy matching</strong> con el algoritmo Ratcliff/Obershelp: calcula la proporción de caracteres en común entre strings.</p>
+        <div class="highlight">
+          "Busquets" → encuentra "Sergio Busquets Burgos" ✓ (alta similitud)<br>
+          "Messi" → encuentra "Lionel Andrés Messi Cuccittini" ✓<br>
+          "Xavi" → NO encuentra "Xavier Hernández Creus" ✗ (no comparten tokens)
+        </div>
+        <p>Limitación conocida y documentada: los apodos que no comparten caracteres con el nombre oficial no funcionan. El fuzzy opera sobre texto, no sobre conocimiento semántico.</p>
+        <p>La herramienta <code>buscar_por_nombre</code> devuelve hasta 5 candidatos para que el usuario confirme — en vez de asumir un match silencioso que podría ser incorrecto.</p>
+      </div>
+    </div>
+
+    <!-- EVALS -->
+    <div class="qa-item" data-tag="eval">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-eval">Evals</span>
+        <span class="qa-q-text">¿Qué son los evals y por qué son importantes en un sistema de IA en producción?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <p>Los evals son <strong>tests automáticos de calidad</strong> que miden si el sistema responde bien — el equivalente a los unit tests, pero para el comportamiento del LLM.</p>
+        <div class="highlight">
+          En Scout AI hay dos capas:<br><br>
+          <strong>Sanity checks (rule-based, sin LLM):</strong> ¿el informe tiene contenido? ¿corrieron los agentes correctos? ¿los valores numéricos están en rango posible? ¿respondió en menos de N segundos? Son determinísticos y baratos — siempre corren.<br><br>
+          <strong>LLM-as-judge:</strong> un modelo evalúa relevancia, grounding y calidad. Más lento — se activa explícitamente con una flag.
+        </div>
+        <p>Los evals permiten: detectar regresiones cuando cambiás el código, comparar versiones objetivamente, y <strong>bloquear un deploy si el score cae</strong> por debajo de un threshold. El script termina con código 1 si falla — integrable directo en CI/CD.</p>
+      </div>
+    </div>
+
+    <div class="qa-item" data-tag="eval">
+      <div class="qa-q" onclick="toggleQA(this)">
+        <span class="qa-tag tag-eval">Evals</span>
+        <span class="qa-q-text">¿Por qué el LLM-as-judge con el mismo modelo es una mala práctica?</span>
+        <span class="qa-arrow">▶</span>
+      </div>
+      <div class="qa-a">
+        <div class="warn">
+          ⚠️ Este es el red flag más importante del sistema — el entrevistador probablemente lo va a preguntar.
+        </div>
+        <p>Se llama <strong>self-serving bias</strong>: un modelo tiende a calificar bien sus propias respuestas independientemente de la calidad real. Es como pedirle a un alumno que se califique a sí mismo — siempre tenderá a darse una nota alta.</p>
+        <div class="highlight">
+          Por qué pasa: el modelo aprendió a generar texto que "suena coherente" para su propio estilo. Cuando evalúa ese texto, lo reconoce como coherente y lo califica alto, aunque la respuesta sea incorrecta o irrelevante.
+        </div>
+        <p>En producción el juez <strong>DEBE ser un modelo independiente y más capaz</strong>: Claude Sonnet, GPT-4o, o al menos una familia diferente con más parámetros. Más capaz porque el juez tiene que detectar errores que el agente mismo cometería.</p>
+        <p>Acá usamos el mismo modelo solo para <strong>aprender el patrón</strong> del pipeline de evals. Los scores no son válidos para decisiones de deploy. Esto está documentado explícitamente en el código.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <hr>
+  <p style="color:var(--muted2);font-size:0.78rem;text-align:center">
+    Scout AI &nbsp;·&nbsp; LangGraph + Langfuse + LiteLLM + StatsBomb Open Data &nbsp;·&nbsp; La Liga 2004–2021
+  </p>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#13161e',
+      mainBkg: '#13161e',
+      nodeBorder: '#2d3347',
+      clusterBkg: '#1a1d27',
+      titleColor: '#e2e8f0',
+      edgeLabelBackground: '#13161e',
+      lineColor: '#475569',
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+  });
+
+  function toggleQA(qEl) {
+    qEl.closest('.qa-item').classList.toggle('open');
+  }
+
+  function filterQA(tag, pill) {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    document.querySelectorAll('.qa-item').forEach(item => {
+      const show = tag === 'all' || item.dataset.tag === tag;
+      item.style.display = show ? '' : 'none';
+      if (!show) item.classList.remove('open');
+    });
+  }
+</script>
+</body>
+</html>

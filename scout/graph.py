@@ -343,7 +343,7 @@ def _build_conclusion_messages(query: str, sections: dict) -> list:
     ]
 
 
-def stream_conclusion(query: str, informe: "InformeScouting"):
+def stream_conclusion(query: str, informe: "InformeScouting", callbacks: list | None = None):
     """
     Generator que produce la conclusión token a token usando streaming del LLM.
 
@@ -360,6 +360,7 @@ def stream_conclusion(query: str, informe: "InformeScouting"):
         query: Query original del usuario (para contexto del prompt).
         informe: InformeScouting con los campos ya populados por el graph
                  (jugadores_sugeridos, estadisticas, comparativa).
+        callbacks: Langfuse/LangChain callbacks para tracing. None = sin tracing.
 
     Yields:
         Fragmentos de texto (str) a medida que el LLM los genera.
@@ -370,9 +371,10 @@ def stream_conclusion(query: str, informe: "InformeScouting"):
         "comp": informe.comparativa,
     }
     messages = _build_conclusion_messages(query, sections)
+    config = {"callbacks": callbacks} if callbacks else {}
 
     print("[conclusion] Iniciando streaming...")
-    for chunk in _conclusion_llm.stream(messages):
+    for chunk in _conclusion_llm.stream(messages, config=config):
         if chunk.content:
             yield chunk.content
     print("[conclusion] Streaming completado")
@@ -470,6 +472,7 @@ def run(
     query: str,
     context_players: list[str] | None = None,
     rag_context: list[str] | None = None,
+    callbacks: list | None = None,
 ) -> InformeScouting:
     """
     Punto de entrada principal. Ejecuta el graph completo para una query.
@@ -482,6 +485,12 @@ def run(
         query: Pregunta o descripción del usuario en lenguaje natural.
         context_players: Jugadores del turno anterior para resolver follow-ups
                          como "comparalo con Ronaldo" o "y sus stats?".
+        rag_context: Resultado RAG del turno anterior para resolver referencias
+                     ordinales ("el primer jugador que me ofreciste").
+        callbacks: Langfuse/LangChain callbacks para tracing. Cuando se pasa
+                   un CallbackHandler de Langfuse, el trace incluye todos los
+                   spans internos del graph (orchestrator, agentes, tools) de
+                   forma automática — no hay instrumentación manual necesaria.
 
     Returns:
         InformeScouting con todos los campos estructurados.
@@ -503,5 +512,6 @@ def run(
     print(f"SCOUT AI — Query: {query}")
     print(f"{'='*60}")
 
-    result = graph.invoke(initial_state)
+    config = {"callbacks": callbacks} if callbacks else {}
+    result = graph.invoke(initial_state, config=config)
     return InformeScouting.model_validate_json(result["final_report"])

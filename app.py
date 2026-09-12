@@ -9,6 +9,8 @@ con visualizaciones interactivas: radar charts, posición en el campo, y cards.
 import re
 
 import streamlit as st
+from dotenv import load_dotenv
+load_dotenv()
 
 st.set_page_config(
     page_title="Scout AI",
@@ -172,6 +174,9 @@ if "last_players" not in st.session_state:
     st.session_state.last_players = []
 if "last_rag_results" not in st.session_state:
     st.session_state.last_rag_results = []
+if "session_id" not in st.session_state:
+    import uuid
+    st.session_state.session_id = str(uuid.uuid4())
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
@@ -517,13 +522,43 @@ if query := st.chat_input("Describí un perfil, pedí stats o compará jugadores
 
     with st.chat_message("assistant", avatar="⚽"):
         from scout.graph import run, stream_conclusion
+        from scout.tracing import get_langfuse, get_callback_handler
+
+        langfuse = get_langfuse()
+        handler = get_callback_handler()
+        callbacks = [handler] if handler else []
 
         with st.spinner("Analizando..."):
-            informe = run(
-                query,
-                context_players=st.session_state.last_players,
-                rag_context=st.session_state.last_rag_results,
-            )
+            if langfuse:
+                # session_id agrupa todos los turnos de la conversación en Langfuse Sessions.
+                # start_as_current_observation activa el contexto OTEL para que el
+                # CallbackHandler genere spans hijos (graph + agentes + tools).
+                with langfuse.start_as_current_observation(
+                    name="scout-query",
+                    as_type="agent",
+                    input={"query": query},
+                ):
+                    informe = run(
+                        query,
+                        context_players=st.session_state.last_players,
+                        rag_context=st.session_state.last_rag_results,
+                        callbacks=callbacks,
+                    )
+                    langfuse.update_current_span(
+                        output={
+                            "agentes_ejecutados": informe.agentes_ejecutados,
+                            "jugadores_detectados": informe.jugadores_detectados,
+                        },
+                    )
+            else:
+                informe = run(
+                    query,
+                    context_players=st.session_state.last_players,
+                    rag_context=st.session_state.last_rag_results,
+                )
+
+        if langfuse:
+            langfuse.flush()
 
         # Actualizar contexto de jugadores para el próximo turno
         if informe.jugadores_detectados:
@@ -538,7 +573,7 @@ if query := st.chat_input("Describí un perfil, pedí stats o compará jugadores
 
         _render_informe(
             informe,
-            stream_fn=lambda: stream_conclusion(query, informe),
+            stream_fn=lambda: stream_conclusion(query, informe, callbacks=callbacks),
         )
 
     st.session_state.messages.append({"role": "assistant", "informe": informe})

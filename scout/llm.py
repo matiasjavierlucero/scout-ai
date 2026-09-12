@@ -1,20 +1,22 @@
 """
-Factory de LLM con auto-detección del entorno.
+Factory de LLM con routing por config.
 
-Prioridad:
-  1. GROQ_API_KEY → ChatGroq (llama-3.1-8b-instant) — gratis, rápido, tool calling
-  2. Sin API key  → ChatOllama (llama3.2:3b) — solo desarrollo local
+Prioridad (un env var cambia el provider sin tocar el código del agente):
+
+  1. LITELLM_MODEL → ChatLiteLLM — una clave cambia el provider:
+       Dev local:    LITELLM_MODEL=ollama/llama3.2:3b
+       Groq free:    LITELLM_MODEL=groq/llama-3.1-8b-instant  (+ GROQ_API_KEY)
+       Producción:   LITELLM_MODEL=claude-3-5-sonnet-20241022 (+ ANTHROPIC_API_KEY)
+
+  2. GROQ_API_KEY → ChatGroq (llama-3.1-8b-instant) — backward compat
+
+  3. Sin API keys → ChatOllama (llama3.2:3b) — solo desarrollo local
 
 Groq free tier: 30 RPM, 14.400 req/día — suficiente para un demo/portfolio.
-Registrate en https://console.groq.com para obtener una API key gratis.
-
-Uso:
-  from scout.llm import make_llm
-  llm = make_llm(temperature=0)
+Ollama requiere el modelo corrido en localhost:11434.
 """
 
 import os
-
 
 GROQ_MODEL = "llama-3.1-8b-instant"
 OLLAMA_MODEL = "llama3.2:3b"
@@ -27,11 +29,20 @@ def make_llm(temperature: float = 0):
     Args:
         temperature: 0 = determinista (agents/tools), 0.3 = creativo (conclusiones).
     """
-    groq_key = os.getenv("GROQ_API_KEY")
+    litellm_model = os.getenv("LITELLM_MODEL")
+    if litellm_model:
+        # LiteLLM mode: un env var controla el provider completo.
+        # LiteLLM entiende el prefijo del modelo:
+        #   "ollama/llama3.2:3b"            → Ollama local
+        #   "groq/llama-3.1-8b-instant"     → Groq API
+        #   "claude-3-5-sonnet-20241022"     → Anthropic directa
+        #   "openai/gpt-4o"                 → OpenAI
+        from langchain_litellm import ChatLiteLLM
+        return ChatLiteLLM(model=litellm_model, temperature=temperature)
 
+    groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         from langchain_groq import ChatGroq
-
         return ChatGroq(
             model=GROQ_MODEL,
             temperature=temperature,
@@ -40,5 +51,4 @@ def make_llm(temperature: float = 0):
 
     # Fallback local — requiere Ollama en localhost:11434
     from langchain_ollama import ChatOllama
-
     return ChatOllama(model=OLLAMA_MODEL, temperature=temperature)
