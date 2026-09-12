@@ -18,7 +18,7 @@ Ollama requiere el modelo corrido en localhost:11434.
 
 import os
 
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "openai/gpt-oss-20b"
 OLLAMA_MODEL = "llama3.2:3b"
 
 

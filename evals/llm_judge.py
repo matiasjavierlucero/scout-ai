@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from scout.llm import make_llm
 
-_GROQ_JUDGE_MODEL = "llama-3.1-8b-instant"
+_GROQ_JUDGE_MODEL = "openai/gpt-oss-120b"
 
 
 @dataclass
