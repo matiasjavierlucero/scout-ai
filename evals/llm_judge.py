@@ -1,42 +1,29 @@
 """
 LLM-as-judge — evaluación de calidad con modelo de lenguaje.
 
-⚠️  RED FLAG DE PRODUCCIÓN — LEER ANTES DE USAR ⚠️
+El juez usa un modelo INDEPENDIENTE al agente cuando GROQ_API_KEY está
+configurada (llama-3.1-8b-instant via Groq). Sin la key, cae a Ollama local
+con el mismo modelo que el agente — self-serving bias activo, scores no
+confiables para decisiones de deploy.
 
-Este módulo usa llama3.2:3b como juez de calidad de las respuestas generadas
-por el mismo llama3.2:3b. Esto es una MALA PRÁCTICA en producción por dos
-razones fundamentales:
+Prioridad del juez:
+  1. GROQ_API_KEY → ChatGroq llama-3.1-8b-instant  (independiente, más capaz)
+  2. Sin key      → ChatOllama llama3.2:3b          (mismo modelo — ⚠️ bias)
 
-  1. Self-serving bias: un modelo tiende a calificarse bien a sí mismo
-     independientemente de la calidad real de sus respuestas. No puede
-     evaluar objetivamente su propio output.
-
-  2. Capacidad insuficiente: un modelo de 3B parámetros no tiene el
-     razonamiento suficiente para ser árbitro confiable de sí mismo.
-
-En producción, el juez DEBE ser:
-  - Un modelo independiente y más capaz: Claude Sonnet, GPT-4o
-  - O al menos una familia diferente: si el agente es llama3.2, el juez
-    debería ser llama3.1:8b o superior (más capacidad + pesos diferentes)
-
-Usamos llama3.2:3b aquí ÚNICAMENTE porque:
-  a) Es el único modelo instalado localmente
-  b) El objetivo es aprender el PATRÓN de LLM-as-judge, no obtener scores
-     confiables
-
-Los scores de este módulo NO son válidos para decisiones de deployment.
-Son útiles para detectar regresiones muy obvias (respuesta completamente
-irrelevante o vacía), pero no para medir calidad real.
-
-Para producción real, reemplazá make_judge_llm() para que devuelva
-un modelo independiente. El resto del código no cambia.
+Por qué Groq en lugar del mismo modelo:
+  - Familia diferente de pesos: el juez no reconoce su propio estilo
+  - Mayor capacidad (8B vs 3B): puede detectar errores que el agente cometería
+  - Gratuito (30 RPM, 14.400 req/día): no agrega costo al pipeline de evals
 """
 
 import json
+import os
 import re
 from dataclasses import dataclass
 
 from scout.llm import make_llm
+
+_GROQ_JUDGE_MODEL = "llama-3.1-8b-instant"
 
 
 @dataclass
@@ -46,20 +33,27 @@ class JudgeResult:
     quality: float        # 0.0 – 1.0: ¿coherente y útil?
     score: float          # promedio de las tres dimensiones
     reasoning: str        # explicación breve del juez
-    model_used: str       # modelo del juez (documentar para trazabilidad)
-    is_same_model_as_agent: bool  # True = red flag activo
+    model_used: str       # modelo del juez (para trazabilidad)
+    is_same_model_as_agent: bool  # True = self-serving bias activo
 
 
 def make_judge_llm():
     """
-    Retorna el LLM que actuará como juez.
+    Retorna el LLM independiente que actuará como juez.
 
-    ⚠️ PRODUCCIÓN: reemplazá este método para devolver un modelo
-    independiente (Claude Sonnet, GPT-4o, etc.) antes de usar los
-    scores para decisiones reales.
+    Prioriza Groq (modelo diferente al agente). Si no hay GROQ_API_KEY,
+    cae a Ollama — is_same_model_as_agent quedará True en ese caso.
     """
-    # En prod: return ChatAnthropic(model="claude-sonnet-4-6") o similar
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        from langchain_groq import ChatGroq
+        return ChatGroq(model=_GROQ_JUDGE_MODEL, temperature=0, api_key=groq_key)
     return make_llm(temperature=0)
+
+
+def _judge_is_independent() -> bool:
+    """True si el juez usa un modelo diferente al agente."""
+    return bool(os.getenv("GROQ_API_KEY"))
 
 
 _JUDGE_LLM = make_judge_llm()
@@ -178,5 +172,5 @@ def judge(query: str, informe) -> JudgeResult:
         score=score,
         reasoning=str(parsed.get("reasoning", "")),
         model_used=type(_JUDGE_LLM).__name__,
-        is_same_model_as_agent=True,  # siempre True hasta que se reemplace make_judge_llm()
+        is_same_model_as_agent=not _judge_is_independent(),
     )

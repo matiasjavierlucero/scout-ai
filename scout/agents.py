@@ -16,6 +16,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import ToolMessage
 
 from scout.llm import make_llm
+from scout.prompts import get_prompt
 from scout.tools import (
     buscar_jugadores,
     comparar_jugadores,
@@ -30,36 +31,19 @@ print(f"[agents] Modelo listo: {type(_llm).__name__}\n")
 rag_agent = create_agent(
     model=_llm,
     tools=[buscar_jugadores],
-    system_prompt=(
-        "Sos un agente de scouting especializado en búsqueda semántica de jugadores. "
-        "Recibís descripciones de perfiles de juego en lenguaje natural y usás la tool "
-        "buscar_jugadores para encontrar los jugadores más similares en el dataset de La Liga. "
-        "Siempre mostrá los resultados de la tool directamente, sin inventar información adicional. "
-        "Si el resultado incluye advertencias de muestra pequeña, mencionálas."
-    ),
+    system_prompt=get_prompt("scout-rag-agent"),
 )
 
 stats_agent = create_agent(
     model=_llm,
     tools=[stats_jugador],
-    system_prompt=(
-        "Sos un agente de scouting especializado en estadísticas de jugadores. "
-        "Dado un nombre, usá directamente stats_jugador — la tool hace fuzzy matching "
-        "internamente si el nombre no es exacto. "
-        "Mencioná la advertencia de muestra pequeña si el jugador tiene menos de 450 minutos."
-    ),
+    system_prompt=get_prompt("scout-stats-agent"),
 )
 
 comp_agent = create_agent(
     model=_llm,
     tools=[comparar_jugadores],
-    system_prompt=(
-        "Sos un agente de scouting especializado en comparación de jugadores. "
-        "Dados dos nombres, usá comparar_jugadores directamente — la tool hace fuzzy matching "
-        "internamente para cada jugador. "
-        "Presentá la tabla comparativa tal como viene de la tool. "
-        "Mencioná advertencias de muestra pequeña si aplica."
-    ),
+    system_prompt=get_prompt("scout-comp-agent"),
 )
 
 
