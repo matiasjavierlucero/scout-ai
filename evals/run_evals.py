@@ -185,44 +185,47 @@ def send_to_langfuse(results: list[dict], avg_sanity: float, run_id: str) -> Non
     print(f"\n  Enviando scores a Langfuse (run_id: {run_id})...")
 
     # En Langfuse v4, create_score requiere trace_id.
-    # Creamos un trace que agrupa todos los scores del run.
-    trace = langfuse.trace(
+    # Abrimos un observation para obtener el trace_id del contexto OTEL.
+    with langfuse.start_as_current_observation(
         name="eval-run",
+        as_type="agent",
         input={"run_id": run_id, "n_cases": len(results)},
-        output={"avg_sanity": avg_sanity},
-        tags=["eval"],
-        metadata={"run_id": run_id},
-    )
+    ):
+        trace_id = langfuse.get_current_trace_id()
 
-    for r in results:
-        if r["error"] or not r["sanity"]:
-            continue
+        for r in results:
+            if r["error"] or not r["sanity"]:
+                continue
 
-        case_score = sum(s.score for s in r["sanity"]) / len(r["sanity"])
-        case_id = r["case"]["id"]
+            case_score = sum(s.score for s in r["sanity"]) / len(r["sanity"])
+            case_id = r["case"]["id"]
 
-        langfuse.create_score(
-            trace_id=trace.id,
-            name="sanity_score",
-            value=case_score,
-            comment=f"case={case_id}",
-        )
-
-        if r["judge"] is not None:
-            bias = "bias" if r["judge"].is_same_model_as_agent else "independent"
             langfuse.create_score(
-                trace_id=trace.id,
-                name="judge_score",
-                value=r["judge"].score,
-                comment=f"case={case_id} judge={bias}",
+                trace_id=trace_id,
+                name="sanity_score",
+                value=case_score,
+                comment=f"case={case_id}",
             )
 
-    langfuse.create_score(
-        trace_id=trace.id,
-        name="eval_avg_sanity",
-        value=avg_sanity,
-        comment=f"n={len(results)} casos",
-    )
+            if r["judge"] is not None:
+                bias = "bias" if r["judge"].is_same_model_as_agent else "independent"
+                langfuse.create_score(
+                    trace_id=trace_id,
+                    name="judge_score",
+                    value=r["judge"].score,
+                    comment=f"case={case_id} judge={bias}",
+                )
+
+        langfuse.create_score(
+            trace_id=trace_id,
+            name="eval_avg_sanity",
+            value=avg_sanity,
+            comment=f"n={len(results)} casos",
+        )
+
+        langfuse.update_current_span(
+            output={"avg_sanity": avg_sanity},
+        )
 
     langfuse.flush()
     print("  ✓ Scores enviados a Langfuse")
