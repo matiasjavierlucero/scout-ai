@@ -7,6 +7,7 @@ con visualizaciones interactivas: radar charts, posición en el campo, y cards.
 """
 
 import re
+from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -177,6 +178,8 @@ if "last_rag_results" not in st.session_state:
 if "session_id" not in st.session_state:
     import uuid
     st.session_state.session_id = str(uuid.uuid4())
+if "view" not in st.session_state:
+    st.session_state.view = "chat"
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
@@ -204,13 +207,22 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.divider()
-    st.markdown(
-        "<a href='/Monitoreo' target='_self' style='"
-        "display:block;color:#475569;font-size:0.82rem;"
-        "text-decoration:none;padding:4px 0;"
-        "'>📊 Monitoreo &amp; Docs</a>",
-        unsafe_allow_html=True,
-    )
+    if st.button("📊 Monitoreo & Docs", use_container_width=True):
+        st.session_state.view = "monitoreo"
+        st.rerun()
+
+# ── Vista Monitoreo ───────────────────────────────────────────────────────────
+
+if st.session_state.view == "monitoreo":
+    if st.button("← Volver al Scout"):
+        st.session_state.view = "chat"
+        st.rerun()
+    html_path = Path("monitoreo-llm-produccion.html")
+    if html_path.exists():
+        st.components.v1.html(html_path.read_text(encoding="utf-8"), height=9000, scrolling=True)
+    else:
+        st.error(f"Archivo no encontrado: {html_path.resolve()}")
+    st.stop()
 
 # ── Header ────────────────────────────────────────────────────────────────────
 
