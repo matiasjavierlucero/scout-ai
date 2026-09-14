@@ -438,22 +438,35 @@ def build_graph():
     """
     workflow = StateGraph(ScoutState)
 
+    # add_node registra una función como nodo del graph, identificado por un nombre (string).
+    # Acá solo DECLARAMOS qué nodos existen — todavía no definimos cómo se conectan entre sí.
+    # Cada función nodo recibe el ScoutState y devuelve un dict parcial que se mergea al estado.
     workflow.add_node("orchestrator", orchestrator_node)
     workflow.add_node("rag_node", rag_node)
     workflow.add_node("stats_node", stats_node)
     workflow.add_node("comp_node", comp_node)
     workflow.add_node("synthesis", synthesis_node)
 
+    # add_edge conecta dos nodos con una transición FIJA e incondicional: A → B, siempre.
+    # No hay lógica de por medio — apenas termina START, se ejecuta "orchestrator" sin excepción.
     workflow.add_edge(START, "orchestrator")
 
-    # route_to_agents lee el estado y devuelve Send objects → LangGraph los ejecuta en paralelo
+    # add_conditional_edges conecta un nodo a MÚLTIPLES destinos posibles, decididos en runtime
+    # por una función de routing (acá route_to_agents). A diferencia de add_edge (transición
+    # única y fija), esta función lee el estado y decide a qué nodo(s) ir — es el equivalente
+    # a un branch condicional dentro del graph.
+    # route_to_agents devuelve Send objects → LangGraph dispara esos nodos en PARALELO
+    # (podés mandar el mismo nodo con distinto payload varias veces, o un subconjunto de ellos).
+    # El tercer argumento (["rag_node", "stats_node", "comp_node"]) es la lista de destinos
+    # posibles — LangGraph la usa para validar el graph y dibujarlo, no filtra el routing real.
     workflow.add_conditional_edges(
         "orchestrator",
         route_to_agents,
         ["rag_node", "stats_node", "comp_node"],
     )
 
-    # cada agente converge en synthesis
+    # cada agente converge en synthesis → de nuevo add_edge, porque acá no hay decisión:
+    # sin importar cuál agente corrió, todos van a synthesis sí o sí.
     workflow.add_edge("rag_node", "synthesis")
     workflow.add_edge("stats_node", "synthesis")
     workflow.add_edge("comp_node", "synthesis")

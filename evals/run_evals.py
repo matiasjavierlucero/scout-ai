@@ -113,7 +113,8 @@ def print_case_results(result: dict) -> None:
         print(f"    {icon} {r.name:<25} {_score_bar(r.score, 12)}  {r.reason[:60]}")
 
     if judge is not None:
-        print(f"\n  LLM Judge (⚠️  mismo modelo → self-serving bias):")
+        bias_tag = "⚠️  mismo modelo → bias activo" if judge.is_same_model_as_agent else "✓ juez independiente"
+        print(f"\n  LLM Judge ({bias_tag}):")
         print(f"    relevance:  {_score_bar(judge.relevance, 12)}")
         print(f"    grounding:  {_score_bar(judge.grounding, 12)}")
         print(f"    quality:    {_score_bar(judge.quality, 12)}")
@@ -174,7 +175,7 @@ def print_summary(results: list[dict], threshold: float) -> float:
 
 
 def send_to_langfuse(results: list[dict], avg_sanity: float, run_id: str) -> None:
-    """Envía los scores de evaluación a Langfuse."""
+    """Envía los scores de evaluación a Langfuse como un trace de eval."""
     from scout.tracing import get_langfuse
     langfuse = get_langfuse()
     if langfuse is None:
@@ -183,6 +184,16 @@ def send_to_langfuse(results: list[dict], avg_sanity: float, run_id: str) -> Non
 
     print(f"\n  Enviando scores a Langfuse (run_id: {run_id})...")
 
+    # En Langfuse v4, create_score requiere trace_id.
+    # Creamos un trace que agrupa todos los scores del run.
+    trace = langfuse.trace(
+        name="eval-run",
+        input={"run_id": run_id, "n_cases": len(results)},
+        output={"avg_sanity": avg_sanity},
+        tags=["eval"],
+        metadata={"run_id": run_id},
+    )
+
     for r in results:
         if r["error"] or not r["sanity"]:
             continue
@@ -190,25 +201,27 @@ def send_to_langfuse(results: list[dict], avg_sanity: float, run_id: str) -> Non
         case_score = sum(s.score for s in r["sanity"]) / len(r["sanity"])
         case_id = r["case"]["id"]
 
-        # Score agrupado por case_id en el comment
         langfuse.create_score(
+            trace_id=trace.id,
             name="sanity_score",
             value=case_score,
-            comment=f"eval_run={run_id} case={case_id}",
+            comment=f"case={case_id}",
         )
 
         if r["judge"] is not None:
+            bias = "bias" if r["judge"].is_same_model_as_agent else "independent"
             langfuse.create_score(
+                trace_id=trace.id,
                 name="judge_score",
                 value=r["judge"].score,
-                comment=f"eval_run={run_id} case={case_id} ⚠️self-serving-bias",
+                comment=f"case={case_id} judge={bias}",
             )
 
-    # Score global del run
     langfuse.create_score(
+        trace_id=trace.id,
         name="eval_avg_sanity",
         value=avg_sanity,
-        comment=f"eval_run={run_id} n={len(results)} casos",
+        comment=f"n={len(results)} casos",
     )
 
     langfuse.flush()
@@ -233,9 +246,13 @@ def main() -> None:
 
     _print_header(f"SCOUT AI — EVALUACIÓN ({len(cases_to_run)} casos)")
     if args.judge:
-        print("\n  ⚠️  LLM-as-judge ACTIVO")
-        print("  ⚠️  Usando el mismo modelo como juez y agente (self-serving bias)")
-        print("  ⚠️  Los scores del juez NO son válidos para decisiones de deploy")
+        from evals.llm_judge import _judge_is_independent
+        if _judge_is_independent():
+            print("\n  ✓  LLM-as-judge ACTIVO — juez independiente (GROQ_API_KEY configurada)")
+        else:
+            print("\n  ⚠️  LLM-as-judge ACTIVO")
+            print("  ⚠️  Usando el mismo modelo como juez y agente (self-serving bias)")
+            print("  ⚠️  Los scores del juez NO son válidos para decisiones de deploy")
 
     results = []
     for case in cases_to_run:
