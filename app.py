@@ -203,6 +203,9 @@ with st.sidebar:
     </p>
     """, unsafe_allow_html=True)
 
+    st.divider()
+    st.page_link("pages/Monitoreo.py", label="📊 Monitoreo & Docs", icon=None)
+
 # ── Header ────────────────────────────────────────────────────────────────────
 
 st.markdown("# Scout AI")
