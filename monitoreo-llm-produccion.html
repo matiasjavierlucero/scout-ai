@@ -312,13 +312,14 @@ flowchart TD
         <span style="color:var(--muted2)">Primera línea de defensa.</span>
       </div>
     </div>
-    <div class="card" style="padding:18px;margin-bottom:0;border-color:#3d2600">
-      <div style="color:var(--yellow);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">llm_judge.py ⚠️</div>
+    <div class="card" style="padding:18px;margin-bottom:0;border-color:#1a3a2e">
+      <div style="color:var(--green);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">llm_judge.py</div>
       <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:6px">LLM como juez de calidad</div>
       <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">
         Evalúa relevancia, grounding y coherencia.<br>
         Lento · opcional · activar con <code>--judge</code>.<br>
-        <span style="color:#f59e0b">Usa el mismo modelo que el agente → self-serving bias → scores no confiables.</span>
+        <span style="color:var(--green)">Con <code>GROQ_API_KEY</code>: juez independiente (<code>gpt-oss-120b</code>) → scores confiables.</span><br>
+        <span style="color:var(--muted2)">Sin key: cae a Ollama → mismo modelo → bias activo.</span>
       </div>
     </div>
     <div class="card" style="padding:18px;margin-bottom:0">
@@ -412,6 +413,110 @@ flowchart TD
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- CI/CD -->
+  <p class="section-label">CI/CD — GitHub Actions como gate de calidad</p>
+
+  <div class="card" style="border-color:#1a2035;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:1.4rem;flex-shrink:0">🔁</span>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">¿Qué hace el workflow y cuándo corre?</div>
+        <div style="color:var(--muted);font-size:0.87rem;line-height:1.7">
+          El archivo <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 5px;border-radius:3px">.github/workflows/evals.yml</code> define un job que <strong style="color:var(--text)">corre automáticamente en cada push a master y en cada Pull Request</strong>. Su objetivo: garantizar que ningún cambio de código rompa la calidad de las respuestas del sistema. Si el score promedio cae debajo del threshold, el commit queda marcado como fallido y el PR no puede mergearse hasta que se corrija.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px;padding:20px 24px">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">Pasos del workflow — en orden</div>
+    <div style="display:flex;flex-direction:column;gap:0">
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--muted2);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;color:var(--muted);font-size:0.75rem;padding-top:2px">checkout</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">actions/checkout@v4</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Clona el repositorio en el runner. Incluye los archivos <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">data/</code> que están commiteados — sin esto el agente no puede arrancar.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;color:var(--muted);font-size:0.75rem;padding-top:2px">uv</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">astral-sh/setup-uv@v4 + uv sync</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Instala uv (el package manager del proyecto) y resuelve todas las dependencias desde <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">uv.lock</code>. Equivalente a <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">pip install -r requirements.txt</code> pero reproducible y fast.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--yellow);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;color:var(--muted);font-size:0.75rem;padding-top:2px">HF cache</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">actions/cache@v4 — modelo de embeddings</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">El modelo <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">paraphrase-multilingual-MiniLM-L12-v2</code> pesa ~470 MB. Sin cache, se descarga en cada corrida (~2 min extra). Con cache, la primera corrida lo baja y las siguientes lo reusan desde <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">~/.cache/huggingface</code>.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid transparent;margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;color:var(--muted);font-size:0.75rem;padding-top:2px">evals</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">uv run python evals/run_evals.py --threshold 0.7</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px"><span style="color:var(--green)">Exit 0</span> → check verde, el PR puede mergearse. <span style="color:var(--red)">Exit 1</span> → check rojo, GitHub bloquea el merge hasta que alguien corrija el problema y vuelva a pasar.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:0">
+    <div class="card" style="margin-bottom:0;padding:18px 20px">
+      <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">4 secrets que necesitás configurar</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <code style="color:var(--cyan);font-size:0.78rem;flex-shrink:0;min-width:160px">GROQ_API_KEY</code>
+          <span style="color:var(--muted);font-size:0.79rem">Para que el juez LLM use <code style="font-size:0.77rem;color:var(--cyan);background:var(--bg-input);padding:1px 3px;border-radius:2px">gpt-oss-120b</code> independiente</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <code style="color:var(--cyan);font-size:0.78rem;flex-shrink:0;min-width:160px">LANGFUSE_PUBLIC_KEY</code>
+          <span style="color:var(--muted);font-size:0.79rem">Para enviar scores de evals al dashboard</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <code style="color:var(--cyan);font-size:0.78rem;flex-shrink:0;min-width:160px">LANGFUSE_SECRET_KEY</code>
+          <span style="color:var(--muted);font-size:0.79rem">Para enviar scores de evals al dashboard</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <code style="color:var(--cyan);font-size:0.78rem;flex-shrink:0;min-width:160px">LANGFUSE_BASE_URL</code>
+          <span style="color:var(--muted);font-size:0.79rem">Si usás self-hosted; omitir para cloud.langfuse.com</span>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;color:var(--muted);font-size:0.78rem">
+        Los secrets se configuran en <strong style="color:var(--text)">GitHub → Settings → Secrets and variables → Actions</strong>. El workflow los inyecta como variables de entorno solo durante la ejecución — nunca quedan en logs.
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:0;padding:18px 20px">
+      <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">Qué pasa si no configurás los secrets</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <div style="color:var(--text);font-size:0.84rem;font-weight:500;margin-bottom:2px">Sin GROQ_API_KEY</div>
+          <div style="color:var(--muted);font-size:0.79rem">El juez LLM no corre. Los sanity checks siguen funcionando. El score se calcula solo con checks determinísticos — igual de válido para CI.</div>
+        </div>
+        <div>
+          <div style="color:var(--text);font-size:0.84rem;font-weight:500;margin-bottom:2px">Sin keys de Langfuse</div>
+          <div style="color:var(--muted);font-size:0.79rem">Los scores no se envían al dashboard. El workflow sigue corriendo y el exit code sigue siendo correcto. Langfuse es opcional en CI.</div>
+        </div>
+        <div>
+          <div style="color:var(--text);font-size:0.84rem;font-weight:500;margin-bottom:2px">Sin ningún secret</div>
+          <div style="color:var(--muted);font-size:0.79rem">El workflow corre completamente offline — solo sanity checks, sin reportar. Es válido como gate básico de regresión.</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -595,7 +700,7 @@ flowchart TD
         </div>
       </div>
 
-      <div style="display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-left:2px solid transparent;margin-left:8px;padding-left:24px;position:relative">
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
         <div style="position:absolute;left:-6px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--bg-card)"></div>
         <div style="min-width:90px;flex-shrink:0">
           <div style="color:var(--blue);font-size:0.75rem;font-weight:600">Paso 3</div>
@@ -606,6 +711,21 @@ flowchart TD
           <div style="color:var(--muted);font-size:0.79rem;line-height:1.6;margin-bottom:8px">Carga <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">player_profiles.json</code>, genera un embedding de 384 dimensiones por jugador usando <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">paraphrase-multilingual-MiniLM-L12-v2</code>, y guarda la matriz y el mapeo nombre→índice. Produce <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">embeddings.npy</code> (2.65 MB) + <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">index.json</code>. El mismo modelo que usa el sistema en runtime — consistencia garantizada.</div>
           <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 12px">
             <code style="color:var(--cyan);font-size:0.82rem">uv run python scripts/build_index.py</code>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-left:2px solid transparent;margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--purple);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:90px;flex-shrink:0">
+          <div style="color:var(--purple);font-size:0.75rem;font-weight:600">Una vez</div>
+          <div style="color:var(--muted);font-size:0.72rem">&lt;1s</div>
+        </div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500;margin-bottom:4px">setup_prompts.py</div>
+          <div style="color:var(--muted);font-size:0.79rem;line-height:1.6;margin-bottom:8px">Registra los 3 system prompts de los agentes en Langfuse Prompt Management. Corre una sola vez al configurar el proyecto. Después, los prompts se editan directamente desde el dashboard de Langfuse — sin tocar código ni hacer deploy. Requiere tener las keys de Langfuse configuradas.</div>
+          <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 12px">
+            <code style="color:var(--cyan);font-size:0.82rem">uv run python scripts/setup_prompts.py</code>
           </div>
         </div>
       </div>
@@ -839,6 +959,179 @@ flowchart TD
         <div style="padding:10px 14px;font-size:0.82rem;color:var(--muted)">Compará <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 3px;border-radius:2px">sanity_score</code> por caso entre los dos runs. El caso que bajó te dice exactamente qué tipo de query empeoró.</div>
       </div>
 
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- PROMPT MANAGEMENT -->
+  <p class="section-label">Prompt Management — prompts versionados en Langfuse</p>
+
+  <div class="card" style="border-color:#2a1a3a;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:1.4rem;flex-shrink:0">✏️</span>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">¿Por qué gestionar prompts fuera del código?</div>
+        <div style="color:var(--muted);font-size:0.87rem;line-height:1.7">
+          Un prompt es la especificación de comportamiento de un agente. Cambiar un prompt sin Langfuse implica: editar el código → commit → push → deploy → esperar. Con Langfuse Prompt Management: abrís el dashboard → editás el texto → guardás → el cambio aplica en el próximo request. Sin tocar código. Sin deploy. Y con <strong style="color:var(--text)">historial de versiones y rollback con un click</strong> si algo empeora.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px;padding:20px 24px">
+    <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">Cómo funciona el flujo completo</div>
+    <div style="display:flex;flex-direction:column;gap:0">
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--purple);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:130px;color:var(--muted);font-size:0.75rem;padding-top:2px">setup_prompts.py</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Una sola vez — sube los prompts iniciales a Langfuse</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Crea los 3 prompts (<code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">scout-rag-agent</code>, <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">scout-stats-agent</code>, <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">scout-comp-agent</code>) con el label <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">production</code>. Después de este paso, los prompts viven en Langfuse — el código solo es fallback.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--cyan);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:130px;color:var(--muted);font-size:0.75rem;padding-top:2px">Langfuse dashboard</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Donde editás los prompts → Prompt Management</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Cada edición crea una nueva versión numerada. Podés ver el diff entre versiones, dejarlas en borrador, promoverlas a <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">production</code>, o hacer rollback a cualquier versión anterior. Sin tocar código.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid var(--border2);margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:130px;color:var(--muted);font-size:0.75rem;padding-top:2px">prompts.py</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Fetches el prompt de Langfuse en cada arranque</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">Llama a <code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">langfuse.get_prompt(name, label="production")</code>. Si Langfuse no está disponible o la key no existe, cae automáticamente al texto hardcodeado en el mismo archivo. El sistema nunca falla por un prompt faltante.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-left:2px solid transparent;margin-left:8px;padding-left:24px;position:relative">
+        <div style="position:absolute;left:-6px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--bg-card)"></div>
+        <div style="min-width:130px;color:var(--muted);font-size:0.75rem;padding-top:2px">agents.py</div>
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:0.86rem;font-weight:500">Usa get_prompt() al inicializar cada agente</div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-top:2px"><code style="font-size:0.78rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">system_prompt=get_prompt("scout-rag-agent")</code> — el agente recibe el texto final, sin saber si vino de Langfuse o del fallback. Cambia el prompt en Langfuse → reiniciás la app → el agente usa la nueva versión.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:0">
+    <div class="card" style="margin-bottom:0;padding:18px 20px">
+      <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">Para usar por primera vez</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:10px 14px">
+          <div style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Subir los 3 prompts a Langfuse (una vez)</div>
+          <code style="color:var(--cyan);font-size:0.82rem">uv run python scripts/setup_prompts.py</code>
+        </div>
+        <div style="color:var(--muted);font-size:0.8rem;line-height:1.6">Después del primer <code style="font-size:0.8rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">setup_prompts.py</code>, los prompts aparecen en el dashboard bajo <strong style="color:var(--text)">Prompt Management</strong> con la etiqueta <code style="font-size:0.8rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">production</code>. No hay que volver a correrlo.</div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:0;padding:18px 20px">
+      <div style="color:var(--muted2);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">Qué podés hacer desde el dashboard</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
+          <span style="color:var(--muted);font-size:0.82rem">Editar el texto del prompt directamente (nueva versión numerada automática)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0"></div>
+          <span style="color:var(--muted);font-size:0.82rem">Comparar versiones lado a lado (diff visual)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0"></div>
+          <span style="color:var(--muted);font-size:0.82rem">Rollback a cualquier versión anterior con un click</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--purple);flex-shrink:0"></div>
+          <span style="color:var(--muted);font-size:0.82rem">Dejar versiones en borrador sin afectar producción</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--cyan);flex-shrink:0"></div>
+          <span style="color:var(--muted);font-size:0.82rem">Ver en qué traces se usó cada versión del prompt</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- VER EN PRODUCCION -->
+  <p class="section-label">Ver este documento — opciones para abrirlo y compartirlo</p>
+
+  <div class="card" style="border-color:#1a2035;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:1.4rem;flex-shrink:0">📄</span>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">¿Qué tipo de archivo es este?</div>
+        <div style="color:var(--muted);font-size:0.87rem;line-height:1.7">
+          Es un HTML estático — un solo archivo sin dependencias locales. El diagrama usa <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 5px;border-radius:3px">mermaid.js</code> cargado desde CDN, el filtro de Q&A es JavaScript inline, y los estilos están embebidos. No necesitás ningún servidor para que funcione — alcanza con abrirlo en el browser. La única condición es tener internet para que cargue Mermaid.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">
+
+    <div class="card" style="margin-bottom:0;padding:20px 22px">
+      <div style="color:var(--green);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Opción 1 — Abrir directo (más simple)</div>
+      <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:8px">Drag &amp; drop al browser</div>
+      <div style="color:var(--muted);font-size:0.81rem;line-height:1.6;margin-bottom:12px">
+        Arrastrá el archivo a Chrome/Firefox. Mermaid carga desde CDN sin problema. Funciona offline para todo excepto el diagrama.
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:9px 13px;margin-bottom:6px">
+        <div style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Linux / Mac terminal</div>
+        <code style="color:var(--cyan);font-size:0.82rem">xdg-open monitoreo-llm-produccion.html</code>
+      </div>
+      <div style="color:var(--muted2);font-size:0.77rem">o simplemente hacé doble click en el archivo desde el explorador.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:0;padding:20px 22px">
+      <div style="color:var(--blue);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Opción 2 — Servidor local (recomendado para compartir en red)</div>
+      <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:8px">Python http.server</div>
+      <div style="color:var(--muted);font-size:0.81rem;line-height:1.6;margin-bottom:12px">
+        Útil si querés compartirlo con alguien en la misma red local, o si el browser bloquea scripts con <code style="font-size:0.8rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">file://</code>.
+      </div>
+      <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:9px 13px;margin-bottom:6px">
+        <div style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Correr desde la raíz del repo</div>
+        <code style="color:var(--cyan);font-size:0.82rem">python -m http.server 8080</code>
+      </div>
+      <div style="color:var(--muted2);font-size:0.77rem">Luego abrir <code style="font-size:0.77rem;color:var(--cyan);background:var(--bg-input);padding:1px 3px;border-radius:2px">localhost:8080/monitoreo-llm-produccion.html</code></div>
+    </div>
+
+    <div class="card" style="margin-bottom:0;padding:20px 22px;border-color:#1a2a1a">
+      <div style="color:var(--purple);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Opción 3 — GitHub Pages (URL permanente)</div>
+      <div style="color:var(--text);font-size:0.88rem;font-weight:500;margin-bottom:8px">URL pública y compartible</div>
+      <div style="color:var(--muted);font-size:0.81rem;line-height:1.6;margin-bottom:12px">
+        Si el repo es público, podés activar GitHub Pages y el archivo queda disponible en una URL fija para compartir con reclutadores o el equipo.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 13px;font-size:0.8rem;color:var(--muted)">
+          <span style="color:var(--purple);font-weight:600">1.</span> GitHub → Settings → Pages
+        </div>
+        <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 13px;font-size:0.8rem;color:var(--muted)">
+          <span style="color:var(--purple);font-weight:600">2.</span> Source: Deploy from branch → <code style="font-size:0.79rem;color:var(--cyan);background:#0d0f14;padding:1px 3px;border-radius:2px">master</code> → <code style="font-size:0.79rem;color:var(--cyan);background:#0d0f14;padding:1px 3px;border-radius:2px">/ (root)</code>
+        </div>
+        <div style="background:var(--bg-input);border:1px solid var(--border2);border-radius:5px;padding:8px 13px;font-size:0.8rem;color:var(--muted)">
+          <span style="color:var(--purple);font-weight:600">3.</span> URL resultante: <code style="font-size:0.79rem;color:var(--cyan);background:#0d0f14;padding:1px 3px;border-radius:2px">https://&lt;usuario&gt;.github.io/scout-ai/monitoreo-llm-produccion.html</code>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="card" style="margin-bottom:0;border-color:#2a1a00">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <span style="color:var(--orange);font-size:1.1rem;flex-shrink:0;margin-top:1px">⚠️</span>
+      <div style="color:var(--muted);font-size:0.84rem;line-height:1.7">
+        <strong style="color:var(--text)">Si el diagrama Mermaid no renderiza:</strong> el browser está bloqueando el script CDN (pasa en algunos contextos <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">file://</code> con CSP estricto). La solución es usar la Opción 2 (servidor local) — con <code style="font-size:0.82rem;color:var(--cyan);background:var(--bg-input);padding:1px 4px;border-radius:2px">http://</code> el CDN carga sin restricciones. Todo lo demás del documento (filtros, cards, Q&amp;A) funciona igual sin conexión.
+      </div>
     </div>
   </div>
 
