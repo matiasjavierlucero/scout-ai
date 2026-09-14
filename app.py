@@ -204,7 +204,13 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.divider()
-    st.page_link("pages/Monitoreo.py", label="📊 Monitoreo & Docs", icon=None)
+    st.markdown(
+        "<a href='/Monitoreo' target='_self' style='"
+        "display:block;color:#475569;font-size:0.82rem;"
+        "text-decoration:none;padding:4px 0;"
+        "'>📊 Monitoreo &amp; Docs</a>",
+        unsafe_allow_html=True,
+    )
 
 # ── Header ────────────────────────────────────────────────────────────────────
 
